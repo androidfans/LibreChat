@@ -46,6 +46,9 @@
   </a>
 </p>
 
+# !IMPORTANT
+
+刘立加的改动文档请参考 CUSTOM_README.md
 
 # ✨ Features
 
