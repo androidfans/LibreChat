@@ -47,7 +47,7 @@ cd /path/to/your/librechat-project
 参考官方文档（如需环境变量、数据库地址等），一般如 `.env` 或 `librechat.yaml` 放在项目根目录。
 
 注意: 新增了一个快速删除的模式, 用于快速清理不用的对话
-`VITE_QUICK_DELETE_CONVERSATIONS=true` 
+`QUICK_DELETE_CONVERSATIONS=true` 
 ---
 
 ## 5. 构建本地 Docker 镜像
