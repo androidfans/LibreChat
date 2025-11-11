@@ -582,6 +582,7 @@
   "com_ui_analyzing_finished": "分析完成",
   "com_ui_api_key": "API 金鑰",
   "com_ui_archive": "封存",
+  "com_ui_archive_success": "封存對話成功",
   "com_ui_archive_error": "封存對話時發生錯誤",
   "com_ui_artifact_click": "點擊開啟",
   "com_ui_artifacts": "成品",
