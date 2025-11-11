@@ -58,3 +58,36 @@ export const useEditArtifact = (
     ...options,
   });
 };
+
+export const useDeleteMessageSubtree = (
+  conversationId: string,
+): UseMutationResult<{ deletedCount: number }, Error, string> => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => dataService.deleteMessageSubtree(conversationId, messageId),
+    onSuccess: (_data, messageId) => {
+      queryClient.setQueryData<t.TMessage[]>([QueryKeys.messages, conversationId], (prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        const deletedIds = new Set<string>();
+        const getDescendants = (parentId: string) => {
+          deletedIds.add(parentId);
+          for (const message of prev) {
+            if (message.parentMessageId === parentId) {
+              getDescendants(message.messageId);
+            }
+          }
+        };
+
+        getDescendants(messageId);
+
+        return prev.filter((message) => !deletedIds.has(message.messageId));
+      });
+
+      queryClient.invalidateQueries([QueryKeys.messages, conversationId]);
+    },
+  });
+};
+

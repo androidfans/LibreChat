@@ -1,9 +1,20 @@
 import React, { useState, useMemo, memo } from 'react';
 import { useRecoilState } from 'recoil';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
-import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
+import {
+  EditIcon,
+  Clipboard,
+  CheckMark,
+  ContinueIcon,
+  RegenerateIcon,
+  TrashIcon,
+  OGDialog,
+  OGDialogTrigger,
+  OGDialogTemplate,
+} from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
+import { useDeleteMessageSubtree } from '~/data-provider/Messages/mutations';
 import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
@@ -122,7 +133,9 @@ const HoverButtons = ({
 }: THoverButtons) => {
   const localize = useLocalize();
   const [isCopied, setIsCopied] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [TextToSpeech] = useRecoilState<boolean>(store.textToSpeech);
+  const deleteMessageSubtree = useDeleteMessageSubtree(conversation?.conversationId ?? '');
 
   const endpoint = useMemo(() => {
     if (!conversation) {
@@ -181,6 +194,11 @@ const HoverButtons = ({
 
   const handleCopy = () => copyToClipboard(setIsCopied);
 
+  const confirmDelete = () => {
+    deleteMessageSubtree.mutate(message.messageId);
+    setDeleteDialogOpen(false);
+  };
+
   return (
     <div className="group visible flex justify-center gap-0.5 self-end focus-within:outline-none lg:justify-start">
       {/* Text to Speech */}
@@ -236,6 +254,35 @@ const HoverButtons = ({
         latestMessageId={latestMessage?.messageId}
         isLast={isLast}
       />
+
+      {/* Delete Button */}
+      <OGDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <OGDialogTrigger asChild>
+          <HoverButton
+            onClick={() => setDeleteDialogOpen(true)}
+            title={localize('com_ui_delete_message')}
+            icon={<TrashIcon className="h-[19px] w-[19px]" />}
+            isLast={isLast}
+            className="text-text-secondary-alt hover:text-red-600"
+          />
+        </OGDialogTrigger>
+        <OGDialogTemplate
+          showCloseButton={false}
+          title={localize('com_ui_delete_message')}
+          className="w-11/12 max-w-lg"
+          main={
+            <div className="text-left text-sm font-medium">
+              {localize('com_ui_delete_message_confirm')}
+            </div>
+          }
+          selection={{
+            selectHandler: confirmDelete,
+            selectClasses:
+              'bg-red-700 dark:bg-red-600 hover:bg-red-800 dark:hover:bg-red-800 text-white',
+            selectText: localize('com_ui_delete'),
+          }}
+        />
+      </OGDialog>
 
       {/* Feedback Buttons */}
       {!isCreatedByUser && handleFeedback != null && (

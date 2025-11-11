@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRecoilValue } from 'recoil';
-import { useParams } from 'react-router-dom';
-import { Constants } from 'librechat-data-provider';
-import { useToastContext, useMediaQuery } from '@librechat/client';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Constants, QueryKeys } from 'librechat-data-provider';
+import { useToastContext, useMediaQuery, TrashIcon } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
-import { useUpdateConversationMutation } from '~/data-provider';
+import { useUpdateConversationMutation, useDeleteConversationMutation } from '~/data-provider';
 import EndpointIcon from '~/components/Endpoints/EndpointIcon';
-import { useNavigateToConvo, useLocalize } from '~/hooks';
+import { useNavigateToConvo, useLocalize, useNewConvo } from '~/hooks';
 import { useGetEndpointsQuery } from '~/data-provider';
 import { NotificationSeverity } from '~/common';
 import { ConvoOptions } from './ConvoOptions';
@@ -14,6 +14,7 @@ import RenameForm from './RenameForm';
 import { cn, logger } from '~/utils';
 import ConvoLink from './ConvoLink';
 import store from '~/store';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface ConversationProps {
   conversation: TConversation;
@@ -23,6 +24,9 @@ interface ConversationProps {
 
 export default function Conversation({ conversation, retainView, toggleNav }: ConversationProps) {
   const params = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { newConversation } = useNewConvo();
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const { navigateToConvo } = useNavigateToConvo();
@@ -32,12 +36,41 @@ export default function Conversation({ conversation, retainView, toggleNav }: Co
   const activeConvos = useRecoilValue(store.allConversationsSelector);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const { conversationId, title = '' } = conversation;
+  const quickDeleteEnabled = import.meta.env.VITE_QUICK_DELETE_CONVERSATIONS === 'true';
 
   const [titleInput, setTitleInput] = useState(title || '');
   const [renaming, setRenaming] = useState(false);
   const [isPopoverActive, setIsPopoverActive] = useState(false);
 
   const previousTitle = useRef(title);
+
+  const deleteMutation = useDeleteConversationMutation({
+    onSuccess: () => {
+      if (currentConvoId === conversationId || currentConvoId === 'new') {
+        newConversation();
+        navigate('/c/new', { replace: true });
+      }
+      queryClient.setQueryData<TConversation[]>([QueryKeys.allConversations], (old) =>
+        old?.filter((c) => c.conversationId !== conversationId),
+      );
+      retainView();
+      showToast({
+        message: localize('com_ui_delete_conversation_success'),
+      });
+    },
+    onError: () => {
+      showToast({
+        message: localize('com_ui_delete_conversation_error'),
+        severity: NotificationSeverity.ERROR,
+      });
+    },
+  });
+
+  const handleQuickDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    deleteMutation.mutate({ conversationId: conversationId ?? '', source: 'button' });
+  };
 
   useEffect(() => {
     if (title !== previousTitle.current) {
@@ -184,13 +217,23 @@ export default function Conversation({ conversation, retainView, toggleNav }: Co
       )}
       <div
         className={cn(
-          'mr-2 flex origin-left',
+          'mr-2 flex origin-left gap-1',
           isPopoverActive || isActiveConvo
-            ? 'pointer-events-auto max-w-[28px] scale-x-100 opacity-100'
-            : 'pointer-events-none max-w-0 scale-x-0 opacity-0 group-focus-within:pointer-events-auto group-focus-within:max-w-[28px] group-focus-within:scale-x-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:max-w-[28px] group-hover:scale-x-100 group-hover:opacity-100',
+            ? 'pointer-events-auto max-w-[60px] scale-x-100 opacity-100'
+            : 'pointer-events-none max-w-0 scale-x-0 opacity-0 group-focus-within:pointer-events-auto group-focus-within:max-w-[60px] group-focus-within:scale-x-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:max-w-[60px] group-hover:scale-x-100 group-hover:opacity-100',
         )}
         aria-hidden={!(isPopoverActive || isActiveConvo)}
       >
+        {!renaming && quickDeleteEnabled && (
+          <button
+            onClick={handleQuickDelete}
+            disabled={deleteMutation.isLoading}
+            className="flex items-center justify-center rounded-md p-1 text-text-secondary hover:text-red-600 hover:bg-surface-hover transition-colors"
+            title={localize('com_ui_delete')}
+          >
+            <TrashIcon className="h-4 w-4" />
+          </button>
+        )}
         {!renaming && <ConvoOptions {...convoOptionsProps} />}
       </div>
     </div>

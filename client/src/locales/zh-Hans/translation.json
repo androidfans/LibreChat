@@ -1299,5 +1299,9 @@
   "com_ui_zoom_in": "放大",
   "com_ui_zoom_level": "缩放级别",
   "com_ui_zoom_out": "缩小",
-  "com_user_message": "您"
+  "com_user_message": "您",
+  "com_ui_delete_message": "删除消息及其后代",
+  "com_ui_delete_message_confirm": "确定要删除此消息及其所有后代消息吗？此操作无法撤销。",
+  "com_ui_delete_conversation_success": "对话已成功删除",
+  "com_ui_delete_conversation_error": "删除对话失败"
 }

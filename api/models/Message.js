@@ -359,6 +359,64 @@ async function deleteMessages(filter) {
   }
 }
 
+/**
+ * Recursively collects all descendant message IDs for a given message.
+ *
+ * @async
+ * @function getMessageSubtree
+ * @param {string} messageId - The root message ID.
+ * @param {string} conversationId - The conversation ID.
+ * @param {string} userId - The user ID for authorization.
+ * @returns {Promise<string[]>} Array of all message IDs in the subtree.
+ * @throws {Error} If there is an error in retrieving messages.
+ */
+async function getMessageSubtree(messageId, conversationId, userId) {
+  try {
+    const children = await Message.find({
+      parentMessageId: messageId,
+      conversationId,
+      user: userId,
+    }).select('messageId').lean();
+
+    let allNodes = [messageId];
+
+    for (const child of children) {
+      const subtree = await getMessageSubtree(child.messageId, conversationId, userId);
+      allNodes = allNodes.concat(subtree);
+    }
+
+    return allNodes;
+  } catch (err) {
+    logger.error('Error getting message subtree:', err);
+    throw err;
+  }
+}
+
+/**
+ * Deletes a message and all its descendants (subtree).
+ *
+ * @async
+ * @function deleteMessageSubtree
+ * @param {string} messageId - The root message ID to delete.
+ * @param {string} conversationId - The conversation ID.
+ * @param {string} userId - The user ID for authorization.
+ * @returns {Promise<Object>} The metadata with count of deleted messages.
+ * @throws {Error} If there is an error in deleting messages.
+ */
+async function deleteMessageSubtree(messageId, conversationId, userId) {
+  try {
+    const messageIds = await getMessageSubtree(messageId, conversationId, userId);
+    return await Message.deleteMany({
+      messageId: { $in: messageIds },
+      conversationId,
+      user: userId,
+    });
+  } catch (err) {
+    logger.error('Error deleting message subtree:', err);
+    throw err;
+  }
+}
+
 module.exports = {
   saveMessage,
   bulkSaveMessages,
@@ -369,4 +427,5 @@ module.exports = {
   getMessages,
   getMessage,
   deleteMessages,
+  deleteMessageSubtree,
 };

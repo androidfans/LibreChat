@@ -8,6 +8,7 @@ const {
   getMessages,
   updateMessage,
   deleteMessages,
+  deleteMessageSubtree,
 } = require('~/models');
 const { findAllArtifacts, replaceArtifactContent } = require('~/server/services/Artifacts/update');
 const { requireJwtAuth, validateMessageReq } = require('~/server/middleware');
@@ -307,6 +308,18 @@ router.delete('/:conversationId/:messageId', validateMessageReq, async (req, res
     res.status(204).send();
   } catch (error) {
     logger.error('Error deleting message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/:conversationId/:messageId/subtree', validateMessageReq, async (req, res) => {
+  try {
+    const { conversationId, messageId } = req.params;
+    const userId = req.user.id;
+    const result = await deleteMessageSubtree(messageId, conversationId, userId);
+    res.status(200).json({ deletedCount: result.deletedCount });
+  } catch (error) {
+    logger.error('Error deleting message subtree:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
