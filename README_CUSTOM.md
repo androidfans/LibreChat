@@ -2,6 +2,7 @@
 
 假设你已经**拿到含有前端、后端全部代码的项目文件夹**，以下指南适用于新机器本地首次部署，确保能构建自己的 Docker 镜像并运行服务，适合二次开发和测试**所有自定义代码**。
 
+必须使用新版 docker compose 命令, 而非 docker-compose 命令, 否则有些写法报错 
 ---
 
 ## 1. 先决条件
@@ -55,16 +56,16 @@ cd /path/to/your/librechat-project
 强烈建议**每次更新代码后重建（带 `--no-cache`）**：
 
 ```bash
-sudo docker-compose build --no-cache
+sudo docker compose build --no-cache
 ```
-（或指定服务名如 `sudo docker-compose build --no-cache api`）
+（或指定服务名如 `sudo docker compose build --no-cache api`）
 
 ---
 
 ## 6. 启动服务
 
 ```bash
-sudo docker-compose up -d
+sudo docker compose up -d
 ```
 启动后访问：http://localhost:3080
 
@@ -78,16 +79,16 @@ sudo docker-compose up -d
     ```
 - 查看日志：
     ```bash
-    sudo docker-compose logs -f
+    sudo docker compose logs -f
     ```
 - 重启（如重建后）：
     ```bash
-    sudo docker-compose down
-    sudo docker-compose up -d
+    sudo docker compose down
+    sudo docker compose up -d
     ```
 - 停止：
     ```bash
-    sudo docker-compose down
+    sudo docker compose down
     ```
 
 ---
@@ -97,9 +98,9 @@ sudo docker-compose up -d
 **每次修改代码后一定要重新构建、重启容器才能生效！**
 
 ```bash
-sudo docker-compose down
-sudo docker-compose build --no-cache
-sudo docker-compose up -d
+sudo docker compose down
+sudo docker compose build --no-cache
+sudo docker compose up -d
 ```
 
 ---
@@ -115,7 +116,7 @@ sudo docker-compose up -d
 ## 10. 常见问题
 
 - **改了代码没生效**
-    - 必须完整 docker-compose build --no-cache 再 up
+    - 必须完整 docker compose build --no-cache 再 up
 - **端口冲突**
     - 检查 3080 端口未被占用，或在 compose 文件中修改映射端口
 - **UID/GID 警告**
