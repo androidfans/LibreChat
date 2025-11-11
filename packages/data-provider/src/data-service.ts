@@ -866,6 +866,13 @@ export function updateFeedback(
   return request.put(endpoints.feedback(conversationId, messageId), payload);
 }
 
+export function deleteMessageSubtree(
+  conversationId: string,
+  messageId: string,
+): Promise<{ deletedCount: number }> {
+  return request.delete(`${endpoints.messages({ conversationId, messageId })}/subtree`);
+}
+
 // 2FA
 export function enableTwoFactor(): Promise<t.TEnable2FAResponse> {
   return request.get(endpoints.enableTwoFactor());
