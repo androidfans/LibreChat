@@ -59,7 +59,7 @@ docker-compose里的环境变量, 例如 `${PORT}` 会自动从 当前目录下�
 3. 没拉到就根据 `build` 配置的信息触发 build
 4. 下次再 `up` 的时候本地有镜像就直接用了
 5. `docker compose up --build` 就是**强制触发 build 覆盖本地镜像**，一般改了代码才用这个
-
+6. `docker compose pull` 可以强制拉取最新镜像
 ---
 
 ## 4. 创建/编辑配置文件
@@ -178,6 +178,7 @@ docker buildx build \
 - `--push`：构建完成后直接推送到远程仓库
 - 最后的 `.` 表示构建上下文为当前目录
 
+可以去 https://cr.console.aliyun.com/cn-hangzhou/instance/dashboard 查看上传的镜像
 ---
 
 ## 9. 其他说明
