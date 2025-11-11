@@ -4,10 +4,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DropdownPopup, Spinner, useToastContext } from '@librechat/client';
 import { Ellipsis, Share2, Copy, Archive, Pen, Trash } from 'lucide-react';
 import type { MouseEvent } from 'react';
+import type { TConversation } from 'librechat-data-provider';
 import {
   useDuplicateConversationMutation,
   useGetStartupConfig,
   useArchiveConvoMutation,
+  useConversationsInfiniteQuery,
 } from '~/data-provider';
 import { useLocalize, useNavigateToConvo, useNewConvo } from '~/hooks';
 import { NotificationSeverity } from '~/common';
@@ -38,6 +40,12 @@ function ConvoOptions({
   const { data: startupConfig } = useGetStartupConfig();
   const { navigateToConvo } = useNavigateToConvo(index);
   const { showToast } = useToastContext();
+
+  // 使用和侧边栏相同的查询来获取对话列表
+  const { data: conversationsData } = useConversationsInfiniteQuery({}, { enabled: true });
+  const allConversations = useMemo(() => {
+    return conversationsData ? conversationsData.pages.flatMap((page) => page.conversations).filter(Boolean) as TConversation[] : [];
+  }, [conversationsData]);
 
   const navigate = useNavigate();
   const { conversationId: currentConvoId } = useParams();
@@ -90,13 +98,39 @@ function ConvoOptions({
       return;
     }
 
+    // 在归档前找到下一个要导航的对话
+    let nextConvo: TConversation | null = null;
+    if (currentConvoId === convoId || currentConvoId === 'new') {
+      // 使用和侧边栏相同的数据源
+      const validConvos = allConversations.filter((c) => !c.isArchived);
+
+      // 找到当前对话的索引
+      const currentIndex = validConvos.findIndex((c) => c.conversationId === conversationId);
+
+      if (currentIndex !== -1 && validConvos.length > 1) {
+        // 尝试找下一个对话
+        if (currentIndex < validConvos.length - 1) {
+          nextConvo = validConvos[currentIndex + 1];
+        } else if (currentIndex > 0) {
+          // 是最后一个，选择上一个
+          nextConvo = validConvos[currentIndex - 1];
+        }
+      }
+    }
+
     archiveConvoMutation.mutate(
       { conversationId: convoId, isArchived: true },
       {
         onSuccess: () => {
           if (currentConvoId === convoId || currentConvoId === 'new') {
-            newConversation();
-            navigate('/c/new', { replace: true });
+            if (nextConvo) {
+              // 导航到下一个对话
+              navigateToConvo(nextConvo);
+            } else {
+              // 没有其他对话，创建新对话
+              newConversation();
+              navigate('/c/new', { replace: true });
+            }
           }
           retainView();
           setIsPopoverActive(false);
@@ -113,8 +147,10 @@ function ConvoOptions({
   }, [
     conversationId,
     currentConvoId,
+    allConversations,
     archiveConvoMutation,
     navigate,
+    navigateToConvo,
     newConversation,
     retainView,
     setIsPopoverActive,

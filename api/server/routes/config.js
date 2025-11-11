@@ -101,7 +101,7 @@ router.get('/', async function (req, res) {
         isEnabled(process.env.SHOW_BIRTHDAY_ICON) ||
         process.env.SHOW_BIRTHDAY_ICON === '',
       helpAndFaqURL: process.env.HELP_AND_FAQ_URL || 'https://librechat.ai',
-      quickDeleteConversations: isEnabled(process.env.QUICK_DELETE_CONVERSATIONS),
+      quickArchiveConversations: isEnabled(process.env.QUICK_ARCHIVE_CONVERSATIONS),
       interface: appConfig?.interfaceConfig,
       turnstile: appConfig?.turnstileConfig,
       modelSpecs: appConfig?.modelSpecs,

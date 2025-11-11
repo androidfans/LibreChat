@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useRecoilValue } from 'recoil';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Constants, QueryKeys } from 'librechat-data-provider';
-import { useToastContext, useMediaQuery, TrashIcon } from '@librechat/client';
+import { useToastContext, useMediaQuery, ArchiveIcon } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
-import { useUpdateConversationMutation, useDeleteConversationMutation } from '~/data-provider';
+import { useUpdateConversationMutation, useArchiveConvoMutation, useConversationsInfiniteQuery } from '~/data-provider';
 import EndpointIcon from '~/components/Endpoints/EndpointIcon';
 import { useNavigateToConvo, useLocalize, useNewConvo } from '~/hooks';
 import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
@@ -13,8 +13,6 @@ import { ConvoOptions } from './ConvoOptions';
 import RenameForm from './RenameForm';
 import { cn, logger } from '~/utils';
 import ConvoLink from './ConvoLink';
-import store from '~/store';
-import { useQueryClient } from '@tanstack/react-query';
 
 interface ConversationProps {
   conversation: TConversation;
@@ -34,10 +32,16 @@ export default function Conversation({ conversation, retainView, toggleNav }: Co
   const { data: startupConfig } = useGetStartupConfig();
   const currentConvoId = useMemo(() => params.conversationId, [params.conversationId]);
   const updateConvoMutation = useUpdateConversationMutation(currentConvoId ?? '');
-  const activeConvos = useRecoilValue(store.allConversationsSelector);
+
+  // 使用和侧边栏相同的查询来获取对话列表
+  const { data: conversationsData } = useConversationsInfiniteQuery({}, { enabled: true });
+  const allConversations = useMemo(() => {
+    return conversationsData ? conversationsData.pages.flatMap((page) => page.conversations).filter(Boolean) as TConversation[] : [];
+  }, [conversationsData]);
+
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const { conversationId, title = '' } = conversation;
-  const quickDeleteEnabled = startupConfig?.quickDeleteConversations === true;
+  const quickArchiveEnabled = startupConfig?.quickArchiveConversations === true;
 
   const [titleInput, setTitleInput] = useState(title || '');
   const [renaming, setRenaming] = useState(false);
@@ -45,32 +49,69 @@ export default function Conversation({ conversation, retainView, toggleNav }: Co
 
   const previousTitle = useRef(title);
 
-  const deleteMutation = useDeleteConversationMutation({
-    onSuccess: () => {
-      if (currentConvoId === conversationId || currentConvoId === 'new') {
-        newConversation();
-        navigate('/c/new', { replace: true });
-      }
-      queryClient.setQueryData<TConversation[]>([QueryKeys.allConversations], (old) =>
-        old?.filter((c) => c.conversationId !== conversationId),
-      );
-      retainView();
-      showToast({
-        message: localize('com_ui_delete_conversation_success'),
-      });
-    },
-    onError: () => {
-      showToast({
-        message: localize('com_ui_delete_conversation_error'),
-        severity: NotificationSeverity.ERROR,
-      });
-    },
-  });
+  const archiveMutation = useArchiveConvoMutation();
 
-  const handleQuickDelete = (e: React.MouseEvent) => {
+  const handleQuickArchive = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    deleteMutation.mutate({ conversationId: conversationId ?? '', source: 'button' });
+    const convoId = conversationId ?? '';
+    if (!convoId) {
+      return;
+    }
+
+    // 在归档前找到下一个要导航的对话
+    let nextConvo: TConversation | null = null;
+    if (currentConvoId === convoId || currentConvoId === 'new') {
+      // 使用和侧边栏相同的数据源
+      const validConvos = allConversations.filter((c) => !c.isArchived);
+
+      // 找到当前对话的索引
+      const currentIndex = validConvos.findIndex((c) => c.conversationId === conversationId);
+
+      if (currentIndex !== -1 && validConvos.length > 1) {
+        // 尝试找下一个对话
+        if (currentIndex < validConvos.length - 1) {
+          nextConvo = validConvos[currentIndex + 1];
+        } else if (currentIndex > 0) {
+          // 是最后一个，选择上一个
+          nextConvo = validConvos[currentIndex - 1];
+        }
+      }
+    }
+
+    archiveMutation.mutate(
+      { conversationId: convoId, isArchived: true },
+      {
+        onSuccess: () => {
+          if (currentConvoId === convoId || currentConvoId === 'new') {
+            if (nextConvo) {
+              // 导航到下一个对话
+              navigateToConvo(nextConvo, {
+                currentConvoId,
+                resetLatestMessage: false,
+              });
+            } else {
+              // 没有其他对话，创建新对话
+              newConversation();
+              navigate('/c/new', { replace: true });
+            }
+          }
+          queryClient.setQueryData<TConversation[]>([QueryKeys.allConversations], (old) =>
+            old?.filter((c) => c.conversationId !== conversationId),
+          );
+          retainView();
+          showToast({
+            message: localize('com_ui_archive_success'),
+          });
+        },
+        onError: () => {
+          showToast({
+            message: localize('com_ui_archive_error'),
+            severity: NotificationSeverity.ERROR,
+          });
+        },
+      },
+    );
   };
 
   useEffect(() => {
@@ -88,10 +129,10 @@ export default function Conversation({ conversation, retainView, toggleNav }: Co
     if (currentConvoId !== Constants.NEW_CONVO) {
       return currentConvoId === conversationId;
     } else {
-      const latestConvo = activeConvos?.[0];
-      return latestConvo === conversationId;
+      const latestConvo = allConversations?.[0];
+      return latestConvo?.conversationId === conversationId;
     }
-  }, [currentConvoId, conversationId, activeConvos]);
+  }, [currentConvoId, conversationId, allConversations]);
 
   const handleRename = () => {
     setIsPopoverActive(false);
@@ -225,14 +266,14 @@ export default function Conversation({ conversation, retainView, toggleNav }: Co
         )}
         aria-hidden={!(isPopoverActive || isActiveConvo)}
       >
-        {!renaming && quickDeleteEnabled && (
+        {!renaming && quickArchiveEnabled && (
           <button
-            onClick={handleQuickDelete}
-            disabled={deleteMutation.isLoading}
-            className="flex items-center justify-center rounded-md p-1 text-text-secondary hover:text-red-600 hover:bg-surface-hover transition-colors"
-            title={localize('com_ui_delete')}
+            onClick={handleQuickArchive}
+            disabled={archiveMutation.isLoading}
+            className="flex items-center justify-center rounded-md p-1 text-text-secondary hover:text-blue-600 hover:bg-surface-hover transition-colors"
+            title={localize('com_ui_archive')}
           >
-            <TrashIcon className="h-4 w-4" />
+            <ArchiveIcon className="h-4 w-4" />
           </button>
         )}
         {!renaming && <ConvoOptions {...convoOptionsProps} />}

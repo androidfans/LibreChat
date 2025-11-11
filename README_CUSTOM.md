@@ -66,9 +66,9 @@ docker-compose里的环境变量, 例如 `${PORT}` 会自动从 当前目录下�
 
 参考官方文档（如需环境变量、数据库地址等），一般如 `.env` 或 `librechat.yaml` 放在项目根目录。
 
-注意: 新增了一个快速删除的模式, 用于快速清理不用的对话
+注意: 新增了一个快速归档的模式, 用于快速归档不用的对话
 ```bash
-QUICK_DELETE_CONVERSATIONS=true
+QUICK_ARCHIVE_CONVERSATIONS=true
 ```
 
 ---
