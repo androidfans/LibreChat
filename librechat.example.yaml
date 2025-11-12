@@ -107,6 +107,7 @@ modelSpecs:
     - laitool-mjrelax 
     - laitool-official 
     - google-official
+    - OpenRouter
   list:
     - name: "poe-Gemini-2.5-Flash"
       # 显示名称
