@@ -66,12 +66,32 @@ endpoints:
           "claude-sonnet-4-5-20250929-thinking", 
           "gpt-4.1-mini"
         ]
-        fetch: false # fetching list of models is not supported
+        fetch: true # fetching list of models is not supported
       titleConvo: true
       titleModel: "gpt-4.1-mini"
       summarize: true
       summaryModel: "gpt-4.1-mini"
       modelDisplayLabel: "来推官转"
+
+    - name: "OpenRouter"
+      # For `apiKey` and `baseURL`, you can use environment variables that you define.
+      # recommended environment variables:
+      apiKey: "${OPENROUTER_KEY}" # NOT OPENROUTER_API_KEY
+      baseURL: "https://openrouter.ai/api/v1"
+      models:
+        default: [
+          "google/gemini-2.5-pro",
+          "anthropic/claude-sonnet-4.5",
+          "openai/gpt-4.1",
+        ]
+        fetch: true
+      titleConvo: true
+      titleModel: "openai/gpt-4.1"
+      summarize: true
+      summaryModel: "openai/gpt-4.1"
+      # Recommended: Drop the stop parameter from the request as Openrouter models use a variety of stop tokens.
+      dropParams: ["stop"]
+      modelDisplayLabel: "OpenRouter"
  
 # modelSpecs节点存在，UI将不再显示预置模型和上面定义的default models, 仅显示model_specs中定义的模型和 addedEndpoints 的endpoints
 modelSpecs:
