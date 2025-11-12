@@ -75,122 +75,122 @@ custom:
  
 # modelSpecs节点存在，UI将不再显示预置模型和上面定义的default models, 仅显示model_specs中定义的模型和 addedEndpoints 的endpoints
 modelSpecs:
-# 配置说明 https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/model_specs
-enforce: false  # 设置为true, 只能使用下面 list 的模型，从二级菜单选择的模型无法正常使用
-prioritize: true # 名字相同的情况下, 覆盖预置模型
-addedEndpoints: # 除了下面定义的模型, 以二级菜单模式显示的端点的模型
-  # 预置 可用 value： agents, openAI, azureOpenAI, google, anthropic, assistants, azureAssistants, bedrock
-  # agents 是助手, 不写就看不见助手了
-  - agents
-  - smallai
-  - POE
-  - laitool-mjrelax 
-  - laitool-official 
-  - google-official
-list:
-  - name: "poe-Gemini-2.5-Flash"
-    # 显示名称
-    label: "POE Gemini-2.5-Flash"
-    default: false # 是否默认选中
-    description: "POE Gemini-2.5-Flash 模型"
-    iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-    preset:
-      endpoint: "POE"  # 对应上面定义的或者预置的端点名称
-      model: "Gemini-2.5-Flash"  # 发送的请求里的模型名称
-      maxContextTokens: 99999999 # 默认值一般为4096, 会导致超长消息被丢弃一些
-      # temperature: 0.7 # POE 默认0.5, 不设置应该默认0.7
-      # max_tokens: 9999999 # 一般来说, max_tokens 的设置不会影响大模型的生成过程，如果模型生成的 Token 数超过max_tokens，本次请求会返回截断后的内容。
-      # modelLabel: "POE Gemini-2.0-Flash"  # 区别上面定义的model, 这里的modelLabel AI 可以在上下文感知到
-      # greeting: "你好，我是POE Gemini-2.0-Flash" #显示在UI界面上的问候语, 可以教用户怎么使用
-      # promptPrefix: "As a financial advisor, ..." # 会添加在发给AI的每一条消息前面, 作为提示语
-      # resendFiles: false # 非持久对话下, 是否重新发送文件, 默认false
- 
-  - name: "poe-Gemini-2.5-Pro"
-    label: "POE Gemini-2.5-Pro"
-    iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-    description: "POE Gemini-2.5-Pro 模型"
-    preset:
-      endpoint: "POE"
-      model: "Gemini-2.5-Pro"
-      maxContextTokens: 99999999
- 
-  - name: "poe-GPT-4o"
-    label: "POE GPT-4o"
-    iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-    description: "POE GPT-4o 模型"
-    preset:
-      endpoint: "POE"
-      model: "GPT-4o"
-      maxContextTokens: 99999999
- 
-  - name: "poe-GPT-4.1-nano"
-    label: "POE GPT-4.1-nano"
-    iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-    description: "POE GPT-4.1-nano 模型"
-    preset:
-      endpoint: "POE"
-      model: "GPT-4.1-nano"
-      maxContextTokens: 99999999
+  # 配置说明 https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/model_specs
+  enforce: false  # 设置为true, 只能使用下面 list 的模型，从二级菜单选择的模型无法正常使用
+  prioritize: true # 名字相同的情况下, 覆盖预置模型
+  addedEndpoints: # 除了下面定义的模型, 以二级菜单模式显示的端点的模型
+    # 预置 可用 value： agents, openAI, azureOpenAI, google, anthropic, assistants, azureAssistants, bedrock
+    # agents 是助手, 不写就看不见助手了
+    - agents
+    - smallai
+    - POE
+    - laitool-mjrelax 
+    - laitool-official 
+    - google-official
+  list:
+    - name: "poe-Gemini-2.5-Flash"
+      # 显示名称
+      label: "POE Gemini-2.5-Flash"
+      default: false # 是否默认选中
+      description: "POE Gemini-2.5-Flash 模型"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      preset:
+        endpoint: "POE"  # 对应上面定义的或者预置的端点名称
+        model: "Gemini-2.5-Flash"  # 发送的请求里的模型名称
+        maxContextTokens: 99999999 # 默认值一般为4096, 会导致超长消息被丢弃一些
+        # temperature: 0.7 # POE 默认0.5, 不设置应该默认0.7
+        # max_tokens: 9999999 # 一般来说, max_tokens 的设置不会影响大模型的生成过程，如果模型生成的 Token 数超过max_tokens，本次请求会返回截断后的内容。
+        # modelLabel: "POE Gemini-2.0-Flash"  # 区别上面定义的model, 这里的modelLabel AI 可以在上下文感知到
+        # greeting: "你好，我是POE Gemini-2.0-Flash" #显示在UI界面上的问候语, 可以教用户怎么使用
+        # promptPrefix: "As a financial advisor, ..." # 会添加在发给AI的每一条消息前面, 作为提示语
+        # resendFiles: false # 非持久对话下, 是否重新发送文件, 默认false
+   
+    - name: "poe-Gemini-2.5-Pro"
+      label: "POE Gemini-2.5-Pro"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      description: "POE Gemini-2.5-Pro 模型"
+      preset:
+        endpoint: "POE"
+        model: "Gemini-2.5-Pro"
+        maxContextTokens: 99999999
+   
+    - name: "poe-GPT-4o"
+      label: "POE GPT-4o"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      description: "POE GPT-4o 模型"
+      preset:
+        endpoint: "POE"
+        model: "GPT-4o"
+        maxContextTokens: 99999999
+   
+    - name: "poe-GPT-4.1-nano"
+      label: "POE GPT-4.1-nano"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      description: "POE GPT-4.1-nano 模型"
+      preset:
+        endpoint: "POE"
+        model: "GPT-4.1-nano"
+        maxContextTokens: 99999999
 
-  - name: "poe-GPT-4.1"
-    label: "POE GPT-4.1"
-    iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-    description: "POE GPT-4.1 模型, 228分"
-    preset:
-      endpoint: "POE"
-      model: "GPT-4.1"
-      maxContextTokens: 99999999
- 
-  - name: "poe-GPT-4.1-mini"
-    label: "POE GPT-4.1-mini"
-    iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-    description: "POE GPT-4.1-mini 模型, 38分"
-    preset:
-      endpoint: "POE"
-      model: "GPT-4.1-mini"
-      maxContextTokens: 99999999
+    - name: "poe-GPT-4.1"
+      label: "POE GPT-4.1"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      description: "POE GPT-4.1 模型, 228分"
+      preset:
+        endpoint: "POE"
+        model: "GPT-4.1"
+        maxContextTokens: 99999999
+   
+    - name: "poe-GPT-4.1-mini"
+      label: "POE GPT-4.1-mini"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      description: "POE GPT-4.1-mini 模型, 38分"
+      preset:
+        endpoint: "POE"
+        model: "GPT-4.1-mini"
+        maxContextTokens: 99999999
 
-  - name: "poe-Claude-Sonnet-4.5"
-    label: "POE Claude-4.5"
-    iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-    description: "POE Claude-4.5 模型"
-    preset:
-      endpoint: "POE"
-      model: "Claude-4.5"
-      maxContextTokens: 99999999
- 
-  - name: "laitool-deepseek-chat"
-    label: "来推 DeepSeek Chat"
-    iconURL: "https://laitool.cc/favicon.ico"
-    description: "deepseek-chat"
-    preset:
-      endpoint: "laitool-mjrelax"
-      model: "deepseek-chat"
-      maxContextTokens: 99999999
- 
-  - name: "laitool-gemini-2.5-flash"
-    label: "来推 Gemini-2.5-flash"
-    iconURL: "https://laitool.cc/favicon.ico"
-    description: "gemini-2.5-flash"
-    preset:
-      endpoint: "laitool-mjrelax"
-      model: "gemini-2.5-flash"
-      maxContextTokens: 99999999
- 
-  - name: "laitool-gemini-2.5-pro"
-    label: "来推 Gemini-2.5-pro"
-    iconURL: "https://laitool.cc/favicon.ico"
-    description: "gemini-2.5-pro"
-    preset:
-      endpoint: "laitool-mjrelax"
-      model: "gemini-2.5-pro"
-      maxContextTokens: 99999999
- 
-  - name: "laitool-claude-3-7-sonnet-20250219"
-    label: "来推官转 Claude 3.7 Sonnet"
-    iconURL: "https://laitool.cc/favicon.ico"
-    description: "claude-3-7-sonnet-20250219"
-    preset:
-      endpoint: "laitool-official"
-      model: "claude-3-7-sonnet-20250219"
-      maxContextTokens: 99999999
+    - name: "poe-Claude-Sonnet-4.5"
+      label: "POE Claude-4.5"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      description: "POE Claude-4.5 模型"
+      preset:
+        endpoint: "POE"
+        model: "Claude-4.5"
+        maxContextTokens: 99999999
+   
+    - name: "laitool-deepseek-chat"
+      label: "来推 DeepSeek Chat"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "deepseek-chat"
+      preset:
+        endpoint: "laitool-mjrelax"
+        model: "deepseek-chat"
+        maxContextTokens: 99999999
+   
+    - name: "laitool-gemini-2.5-flash"
+      label: "来推 Gemini-2.5-flash"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "gemini-2.5-flash"
+      preset:
+        endpoint: "laitool-mjrelax"
+        model: "gemini-2.5-flash"
+        maxContextTokens: 99999999
+   
+    - name: "laitool-gemini-2.5-pro"
+      label: "来推 Gemini-2.5-pro"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "gemini-2.5-pro"
+      preset:
+        endpoint: "laitool-mjrelax"
+        model: "gemini-2.5-pro"
+        maxContextTokens: 99999999
+   
+    - name: "laitool-claude-3-7-sonnet-20250219"
+      label: "来推官转 Claude 3.7 Sonnet"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "claude-3-7-sonnet-20250219"
+      preset:
+        endpoint: "laitool-official"
+        model: "claude-3-7-sonnet-20250219"
+        maxContextTokens: 99999999
