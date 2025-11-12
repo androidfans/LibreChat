@@ -1,77 +1,77 @@
 version: 1.1.4
 cache: true
 endpoints:
-custom:
-  - name: "POE"
-    apiKey: "${POE_KEY}"
-    # baseURL: "http://host.docker.internal:39527/v1"
-    baseURL: "https://api.poe.com/v1"
-    models:
-      default: [
-        "Gemini-2.5-Flash",
-        "Gemini-2.5-Pro",
-        "GPT-4o",
-        "GPT-4.1-nano",
-        "GPT-4.1-mini",
-        "GPT-4.1",
-        "DeepSeek-V3",
-        "Claude-Sonnet-4.5",
-        "Claude-Sonnet-4",
-        "Claude-Sonnet-3.7",
-        "Claude-Sonnet-3.7-Reasoning",
-        "Claude-Sonnet-3.5",
-        "imitation_writing",
-        "short_video_analyzis",
-        "script_write_twice",
-      ]
-      fetch: true # 走api获取模型列表, 自建服务器没实现这个功能, 官方api可以打开
-    titleConvo: true  # 是否生成对话标题
-    titleModel: "GPT-4.1-mini" # 用来生成标题的模型, 不要用 Gemini-2.0-Flash模型 在默认prompt下会返回多余的 related search, 导致UI显示异常
-    titleMethod: "completion" # function 或 completion, function是调用函数生成标题, completion是解析对话用模型生成标题
-    summarize: true
-    summaryModel: "GPT-4.1-mini"
-    forcePrompt: false # 一般false，为true的话 1. 会去请求 /completion 而不是 /chat/completion 2. 请求体里的messages字段改名为prompt,值为所有消息的合并
-    modelDisplayLabel: "POE"
-    titleMessageRole: "system" # 生成标题的请求role值, 默认为system. POE的Gemini系列模型因为有bug, 会忽略system消息, 这里改为user
-    # addParams: # 服务商需要的额外参数
-      # endpoint_api_specific_key: ""
-    # dropParams: # 去掉一些参数, 以满足服务商的api特殊要求
-      # - "stop"
-    # headers: # 额外的请求头
-      # Content-Type: "application/json"
-    # directEndpoint: false # 为true的话, 直接使用这个endpoint的url, 不会拼接成 /chat/completion 的url, 例如: http://host.docker.internal:39527/v1/chat/completion
+  custom:
+    - name: "POE"
+      apiKey: "${POE_KEY}"
+      # baseURL: "http://host.docker.internal:39527/v1"
+      baseURL: "https://api.poe.com/v1"
+      models:
+        default: [
+          "Gemini-2.5-Flash",
+          "Gemini-2.5-Pro",
+          "GPT-4o",
+          "GPT-4.1-nano",
+          "GPT-4.1-mini",
+          "GPT-4.1",
+          "DeepSeek-V3",
+          "Claude-Sonnet-4.5",
+          "Claude-Sonnet-4",
+          "Claude-Sonnet-3.7",
+          "Claude-Sonnet-3.7-Reasoning",
+          "Claude-Sonnet-3.5",
+          "imitation_writing",
+          "short_video_analyzis",
+          "script_write_twice",
+        ]
+        fetch: true # 走api获取模型列表, 自建服务器没实现这个功能, 官方api可以打开
+      titleConvo: true  # 是否生成对话标题
+      titleModel: "GPT-4.1-mini" # 用来生成标题的模型, 不要用 Gemini-2.0-Flash模型 在默认prompt下会返回多余的 related search, 导致UI显示异常
+      titleMethod: "completion" # function 或 completion, function是调用函数生成标题, completion是解析对话用模型生成标题
+      summarize: true
+      summaryModel: "GPT-4.1-mini"
+      forcePrompt: false # 一般false，为true的话 1. 会去请求 /completion 而不是 /chat/completion 2. 请求体里的messages字段改名为prompt,值为所有消息的合并
+      modelDisplayLabel: "POE"
+      titleMessageRole: "system" # 生成标题的请求role值, 默认为system. POE的Gemini系列模型因为有bug, 会忽略system消息, 这里改为user
+      # addParams: # 服务商需要的额外参数
+        # endpoint_api_specific_key: ""
+      # dropParams: # 去掉一些参数, 以满足服务商的api特殊要求
+        # - "stop"
+      # headers: # 额外的请求头
+        # Content-Type: "application/json"
+      # directEndpoint: false # 为true的话, 直接使用这个endpoint的url, 不会拼接成 /chat/completion 的url, 例如: http://host.docker.internal:39527/v1/chat/completion
 
-  - name: "laitool-mjrelax"
-    apiKey: "${LAITOOL_MJRELAX_KEY}"
-    baseURL: "https://laitool.cc/v1/"
-    models:
-      default: [
-        "deepseek-chat",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-      ]
-      fetch: false
-    titleConvo: true
-    titleModel: "deepseek-chat"
-    summarize: true
-    summaryModel: "deepseek-chat"
-    modelDisplayLabel: "来推"
- 
-  - name: "laitool-official"
-    apiKey: "${LAITOOL_OFFICIAL_KEY}"
-    baseURL: "https://laitool.cc/v1/"
-    models:
-      default: [
-        "claude-sonnet-4-5-20250929",
-        "claude-sonnet-4-5-20250929-thinking", 
-        "gpt-4.1-mini"
-      ]
-      fetch: false # fetching list of models is not supported
-    titleConvo: true
-    titleModel: "gpt-4.1-mini"
-    summarize: true
-    summaryModel: "gpt-4.1-mini"
-    modelDisplayLabel: "来推官转"
+    - name: "laitool-mjrelax"
+      apiKey: "${LAITOOL_MJRELAX_KEY}"
+      baseURL: "https://laitool.cc/v1/"
+      models:
+        default: [
+          "deepseek-chat",
+          "gemini-2.5-flash",
+          "gemini-2.5-pro",
+        ]
+        fetch: false
+      titleConvo: true
+      titleModel: "deepseek-chat"
+      summarize: true
+      summaryModel: "deepseek-chat"
+      modelDisplayLabel: "来推"
+   
+    - name: "laitool-official"
+      apiKey: "${LAITOOL_OFFICIAL_KEY}"
+      baseURL: "https://laitool.cc/v1/"
+      models:
+        default: [
+          "claude-sonnet-4-5-20250929",
+          "claude-sonnet-4-5-20250929-thinking", 
+          "gpt-4.1-mini"
+        ]
+        fetch: false # fetching list of models is not supported
+      titleConvo: true
+      titleModel: "gpt-4.1-mini"
+      summarize: true
+      summaryModel: "gpt-4.1-mini"
+      modelDisplayLabel: "来推官转"
  
 # modelSpecs节点存在，UI将不再显示预置模型和上面定义的default models, 仅显示model_specs中定义的模型和 addedEndpoints 的endpoints
 modelSpecs:
