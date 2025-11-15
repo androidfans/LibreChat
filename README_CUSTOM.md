@@ -160,14 +160,14 @@ docker buildx inspect --bootstrap
 ```
 
 ### 步骤三：构建多架构镜像并推送
-如果出bug就把 `Dockerfile.multi` 换成 `Dockerfile`
+`Dockerfile.multi` 好像有bug, 就用 `Dockerfile`吧, 别用multi
 
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   -t crpi-3qv8qlhd6grgh1k4.cn-hangzhou.personal.cr.aliyuncs.com/xuqesj09/librechat:latest \
   -t crpi-3qv8qlhd6grgh1k4.cn-hangzhou.personal.cr.aliyuncs.com/xuqesj09/librechat:v0.8.1 \
-  -f Dockerfile.multi \
+  -f Dockerfile \
   --push \
   .
 ```
