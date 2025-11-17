@@ -92,6 +92,22 @@ endpoints:
       # Recommended: Drop the stop parameter from the request as Openrouter models use a variety of stop tokens.
       dropParams: ["stop"]
       modelDisplayLabel: "OpenRouter"
+
+    - name: "copilot"
+      apiKey: "dummy"
+      baseURL: "http://host.docker.internal:4141/v1/"
+      models:
+        default: [
+          "gpt-4.1",
+          "claude-sonnet-4.5",
+          "gemini-2.5-pro",
+        ]
+        fetch: false
+      titleConvo: true
+      titleModel: "gpt-4.1"
+      summarize: true
+      summaryModel: "gpt-4.1"
+      modelDisplayLabel: "Copilot逆向API"
  
 # modelSpecs节点存在，UI将不再显示预置模型和上面定义的default models, 仅显示model_specs中定义的模型和 addedEndpoints 的endpoints
 modelSpecs:
@@ -108,6 +124,7 @@ modelSpecs:
     - laitool-official 
     - google-official
     - OpenRouter
+    - copilot
   list:
     - name: "poe-Gemini-2.5-Flash"
       # 显示名称
