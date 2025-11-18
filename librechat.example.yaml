@@ -98,11 +98,11 @@ endpoints:
       baseURL: "http://host.docker.internal:4141/v1/"
       models:
         default: [
+          "gemini-2.5-pro",
           "gpt-4.1",
           "claude-sonnet-4.5",
-          "gemini-2.5-pro",
         ]
-        fetch: false
+        fetch: true
       titleConvo: true
       titleModel: "gpt-4.1"
       summarize: true
