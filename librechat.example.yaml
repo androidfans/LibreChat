@@ -10,6 +10,7 @@ endpoints:
         default: [
           "Gemini-2.5-Flash",
           "Gemini-2.5-Pro",
+          "Gemini-3-Pro",
           "GPT-4o",
           "GPT-4.1-nano",
           "GPT-4.1-mini",
@@ -151,6 +152,15 @@ modelSpecs:
       preset:
         endpoint: "POE"
         model: "Gemini-2.5-Pro"
+        maxContextTokens: 99999999
+
+    - name: "poe-Gemini-3-Pro"
+      label: "POE Gemini-3-Pro"
+      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
+      description: "POE Gemini-3-Pro 模型"
+      preset:
+        endpoint: "POE"
+        model: "Gemini-3-Pro"
         maxContextTokens: 99999999
    
     - name: "poe-GPT-4o"
