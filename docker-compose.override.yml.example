@@ -199,6 +199,26 @@ services:
         source: ./librechat.yaml
         target: /app/librechat.yaml
 
+  # https反代功能主要是加了下面这段
+  reverse-proxy:
+    image: nginx:latest
+    container_name: librechat-ssl-proxy
+    restart: always
+    ports:
+      # 宿主机56150的端口:容器内
+      # 相当于访问宿主机前的56150实际会访问容器内443
+      # 容器内的监听443端口和访问容器443以后转发到实际的服务端口${PORT}是在 nginx.conf 里配置的
+      - "56150:443"  # 公开的 HTTPS 端口
+    volumes:
+      # 配置文件和证书的路径映射
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs/nginx.crt:/etc/nginx/nginx.crt:ro
+      - ./nginx/certs/nginx.key:/etc/nginx/nginx.key:ro
+    depends_on:
+      - api
+    networks:
+      - default
+
   db-backup:
     container_name: librechat_db_backup
     image: tiredofit/db-backup:4.1.18
