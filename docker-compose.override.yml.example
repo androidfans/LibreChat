@@ -179,3 +179,107 @@
 #      - POSTGRES_DB=postgres
 #    volumes:
 #      - ./postgres:/var/lib/postgresql/data
+
+
+# 备份文件命令
+# doppler run -- docker compose exec db-backup bash backup-now
+# 备份数据库命令 mongo + vector
+# doppler run -- docker compose exec files-backup backup
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: 'crpi-3qv8qlhd6grgh1k4.cn-hangzhou.personal.cr.aliyuncs.com/xuqesj09/librechat:latest'
+    ports:
+      - '${PORT}:${PORT}'
+    volumes:
+      - type: bind
+        source: ./librechat.yaml
+        target: /app/librechat.yaml
+
+  db-backup:
+    container_name: librechat_db_backup
+    image: tiredofit/db-backup:4.1.18
+    restart: always
+    depends_on:
+      - vectordb
+      - mongodb
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TIMEZONE=Asia/Shanghai
+      - CONTAINER_ENABLE_MONITORING=FALSE
+
+      # ==========================================
+      # 数据库 01: Postgres (VectorDB)
+      # ==========================================
+      - DB01_TYPE=pgsql
+      - DB01_HOST=vectordb
+      - DB01_NAME=mydatabase
+      - DB01_USER=myuser
+      - DB01_PASS=mypassword
+      - DB01_PORT=5432
+
+      # 调度与策略
+      - DB01_BACKUP_INTERVAL=1440
+      - DB01_BACKUP_BEGIN=0300
+      - DB01_BACKUP_LOCATION=S3
+      - DB01_CLEANUP_TIME=10080
+      - DB01_COMPRESSION=ZSTD
+
+      # S3 配置 (Bitiful)
+      - DB01_S3_PROTOCOL=https
+      - DB01_S3_HOST=s3.bitiful.net
+      - DB01_S3_REGION=us-east-1
+      - DB01_S3_BUCKET=${BACKUP_S3_BUCKET:-docker-backup}
+      - DB01_S3_PATH=${BACKUP_S3_PATH:-librechat-db-backups}
+      - DB01_S3_KEY_ID=${BACKUP_S3_ACCESS_KEY}
+      - DB01_S3_KEY_SECRET=${BACKUP_S3_SECRET_KEY}
+
+      # ==========================================
+      # 数据库 02: MongoDB
+      # ==========================================
+      - DB02_TYPE=mongo
+      - DB02_HOST=mongodb
+      - DB02_NAME=LibreChat
+      - DB02_PORT=27017
+
+      # 调度与策略 (与 DB01 保持一致)
+      - DB02_BACKUP_INTERVAL=1440
+      - DB02_BACKUP_BEGIN=0300
+      - DB02_BACKUP_LOCATION=S3
+      - DB02_CLEANUP_TIME=10080
+      - DB02_COMPRESSION=GZ
+
+      # S3 配置 (必须为 DB02 单独再写一遍，确保生效)
+      - DB02_S3_PROTOCOL=https
+      - DB02_S3_HOST=s3.bitiful.net
+      - DB02_S3_REGION=us-east-1
+      - DB02_S3_BUCKET=${BACKUP_S3_BUCKET:-docker-backup}
+      - DB02_S3_PATH=${BACKUP_S3_PATH:-librechat-db-backups}
+      - DB02_S3_KEY_ID=${BACKUP_S3_ACCESS_KEY}
+      - DB02_S3_KEY_SECRET=${BACKUP_S3_SECRET_KEY}
+
+  files-backup:
+    container_name: librechat_files_backup
+    image: offen/docker-volume-backup:v2
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai
+      - BACKUP_CRON_EXPRESSION=30 3 * * *
+      - BACKUP_FILENAME=librechat-files-%Y%m%d-%H%M%S.tar.gz
+      - BACKUP_PRUNING_PREFIX=librechat-files-
+      - BACKUP_RETENTION_DAYS=7
+      - AWS_S3_BUCKET_NAME=${BACKUP_S3_BUCKET:-docker-backup}
+      - AWS_S3_PATH=librechat-files-backups
+      - AWS_ENDPOINT=s3.bitiful.net
+      - AWS_ENDPOINT_PROTO=https
+      - AWS_S3_BUCKET_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=${BACKUP_S3_ACCESS_KEY}
+      - AWS_SECRET_ACCESS_KEY=${BACKUP_S3_SECRET_KEY}
+    volumes:
+      - ./uploads:/backup/uploads:ro
+      - ./images:/backup/images:ro
+      - ./.env:/backup/env_file:ro
