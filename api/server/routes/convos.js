@@ -156,33 +156,44 @@ router.delete('/all', async (req, res) => {
 const MAX_CONVO_TITLE_LENGTH = 1024;
 
 /**
- * Updates a conversation's title.
+ * Updates a conversation's title or archive status.
  * @route POST /update
  * @param {string} req.body.arg.conversationId - The conversation ID to update.
- * @param {string} req.body.arg.title - The new title for the conversation.
+ * @param {string} [req.body.arg.title] - The new title for the conversation.
+ * @param {boolean} [req.body.arg.isArchived] - The archive status of the conversation.
  * @returns {object} 201 - The updated conversation object.
  */
 router.post('/update', validateConvoAccess, async (req, res) => {
-  const { conversationId, title } = req.body.arg ?? {};
+  const { conversationId, title, isArchived } = req.body.arg ?? {};
 
   if (!conversationId) {
     return res.status(400).json({ error: 'conversationId is required' });
   }
 
-  if (title === undefined) {
-    return res.status(400).json({ error: 'title is required' });
+  if (title === undefined && isArchived === undefined) {
+    return res.status(400).json({ error: 'title or isArchived is required' });
   }
 
-  if (typeof title !== 'string') {
-    return res.status(400).json({ error: 'title must be a string' });
+  const update = { conversationId };
+
+  if (title !== undefined) {
+    if (typeof title !== 'string') {
+      return res.status(400).json({ error: 'title must be a string' });
+    }
+    update.title = title.trim().slice(0, MAX_CONVO_TITLE_LENGTH);
   }
 
-  const sanitizedTitle = title.trim().slice(0, MAX_CONVO_TITLE_LENGTH);
+  if (isArchived !== undefined) {
+    if (typeof isArchived !== 'boolean') {
+      return res.status(400).json({ error: 'isArchived must be a boolean' });
+    }
+    update.isArchived = isArchived;
+  }
 
   try {
     const dbResponse = await saveConvo(
       req,
-      { conversationId, title: sanitizedTitle },
+      update,
       { context: `POST /api/convos/update ${conversationId}` },
     );
     res.status(201).json(dbResponse);
