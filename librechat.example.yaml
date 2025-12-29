@@ -134,7 +134,7 @@ modelSpecs:
 
     - name: "copilot-gemini-2.5-pro"
       label: "Copilot Gemini 2.5 Pro"
-      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
@@ -143,7 +143,7 @@ modelSpecs:
 
     - name: "copilot-gemini-3-pro-preview"
       label: "Copilot Gemini 3 Pro"
-      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
@@ -152,7 +152,7 @@ modelSpecs:
 
     - name: "copilot-gemini-3-flash-preview"
       label: "Copilot Gemini 3 flash"
-      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
@@ -161,7 +161,7 @@ modelSpecs:
 
     - name: "copilot-claude-sonnet-4.5"
       label: "Copilot Claude Sonnet 4.5"
-      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
@@ -170,7 +170,7 @@ modelSpecs:
 
     - name: "copilot-claude-opus-4.5"
       label: "Copilot Claude Opus 4.5"
-      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
