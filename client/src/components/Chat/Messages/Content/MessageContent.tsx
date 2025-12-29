@@ -5,6 +5,7 @@ import type { TMessage } from 'librechat-data-provider';
 import type { TMessageContentProps, TDisplayProps } from '~/common';
 import Error from '~/components/Messages/Content/Error';
 import { useMessageContext } from '~/Providers';
+import CollapsibleText from './Parts/CollapsibleText';
 import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
 import Thinking from './Parts/Thinking';
@@ -101,13 +102,14 @@ const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplay
   );
 
   const content = useMemo(() => {
+    // 所有消息都使用 CollapsibleText 包裹，它会自动判断是否需要折叠
     if (!isCreatedByUser) {
-      return <Markdown content={text} isLatestMessage={isLatestMessage} />;
+      return <CollapsibleText text={text} isCreatedByUser={isCreatedByUser} isMarkdown={true} />;
     }
     if (enableUserMsgMarkdown) {
-      return <MarkdownLite content={text} />;
+      return <CollapsibleText text={text} isCreatedByUser={isCreatedByUser} isMarkdown={true} />;
     }
-    return <>{text}</>;
+    return <CollapsibleText text={text} isCreatedByUser={isCreatedByUser} isMarkdown={false} />;
   }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage]);
 
   return (
