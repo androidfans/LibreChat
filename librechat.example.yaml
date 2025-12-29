@@ -132,6 +132,15 @@ modelSpecs:
         model: "claude-3-7-sonnet-20250219"
         maxContextTokens: 99999999
 
+    - name: "copilot-gemini-2.5-pro"
+      label: "Copilot Gemini 2.5 Pro"
+      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "gemini-2.5-pro"
+        maxContextTokens: 99999999
+
     - name: "copilot-gemini-3-pro-preview"
       label: "Copilot Gemini 3 Pro"
       iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
