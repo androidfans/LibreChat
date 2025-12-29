@@ -6,12 +6,10 @@ import type { TMessageContentProps, TDisplayProps } from '~/common';
 import Error from '~/components/Messages/Content/Error';
 import { useMessageContext } from '~/Providers';
 import CollapsibleText from './Parts/CollapsibleText';
-import MarkdownLite from './MarkdownLite';
 import EditMessage from './EditMessage';
 import Thinking from './Parts/Thinking';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
-import Markdown from './Markdown';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -93,7 +91,7 @@ export const ErrorMessage = ({
 };
 
 const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplayProps) => {
-  const { isSubmitting = false, isLatestMessage = false } = useMessageContext();
+  const { isSubmitting = false } = useMessageContext();
   const enableUserMsgMarkdown = useRecoilValue(store.enableUserMsgMarkdown);
 
   const showCursorState = useMemo(
@@ -110,7 +108,7 @@ const DisplayMessage = ({ text, isCreatedByUser, message, showCursor }: TDisplay
       return <CollapsibleText text={text} isCreatedByUser={isCreatedByUser} isMarkdown={true} />;
     }
     return <CollapsibleText text={text} isCreatedByUser={isCreatedByUser} isMarkdown={false} />;
-  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage]);
+  }, [isCreatedByUser, enableUserMsgMarkdown, text]);
 
   return (
     <Container message={message}>

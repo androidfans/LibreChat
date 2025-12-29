@@ -1,7 +1,5 @@
 import { memo, useMemo, ReactElement } from 'react';
 import { useRecoilValue } from 'recoil';
-import MarkdownLite from '~/components/Chat/Messages/Content/MarkdownLite';
-import Markdown from '~/components/Chat/Messages/Content/Markdown';
 import CollapsibleText from './CollapsibleText';
 import { useMessageContext } from '~/Providers';
 import { cn } from '~/utils';
@@ -13,18 +11,12 @@ type TextPartProps = {
   isCreatedByUser: boolean;
 };
 
-type ContentType =
-  | ReactElement<React.ComponentProps<typeof Markdown>>
-  | ReactElement<React.ComponentProps<typeof MarkdownLite>>
-  | ReactElement<React.ComponentProps<typeof CollapsibleText>>
-  | ReactElement;
-
 const TextPart = memo(({ text, isCreatedByUser, showCursor }: TextPartProps) => {
-  const { isSubmitting = false, isLatestMessage = false } = useMessageContext();
+  const { isSubmitting = false } = useMessageContext();
   const enableUserMsgMarkdown = useRecoilValue(store.enableUserMsgMarkdown);
   const showCursorState = useMemo(() => showCursor && isSubmitting, [showCursor, isSubmitting]);
 
-  const content: ContentType = useMemo(() => {
+  const content: ReactElement = useMemo(() => {
     if (!isCreatedByUser) {
       // AI 消息：使用 CollapsibleText 包裹 Markdown
       return <CollapsibleText text={text} isCreatedByUser={isCreatedByUser} isMarkdown={true} />;
@@ -35,7 +27,7 @@ const TextPart = memo(({ text, isCreatedByUser, showCursor }: TextPartProps) => 
       // 用户消息纯文本
       return <CollapsibleText text={text} isCreatedByUser={isCreatedByUser} isMarkdown={false} />;
     }
-  }, [isCreatedByUser, enableUserMsgMarkdown, text, isLatestMessage]);
+  }, [isCreatedByUser, enableUserMsgMarkdown, text]);
 
   return (
     <div
