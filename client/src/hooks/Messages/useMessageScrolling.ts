@@ -69,6 +69,7 @@ export default function useMessageScrolling(messagesTree?: TMessage[] | null) {
       scrollCallback();
       setAbortScroll(false);
     },
+    scrollableRef,
   });
 
   useEffect(() => {
