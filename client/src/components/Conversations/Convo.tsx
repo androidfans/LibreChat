@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Constants, QueryKeys } from 'librechat-data-provider';
@@ -6,7 +6,7 @@ import { useToastContext, useMediaQuery, ArchiveIcon } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
 import { useUpdateConversationMutation, useArchiveConvoMutation, useConversationsInfiniteQuery } from '~/data-provider';
 import EndpointIcon from '~/components/Endpoints/EndpointIcon';
-import { useNavigateToConvo, useLocalize, useNewConvo } from '~/hooks';
+import { useNavigateToConvo, useLocalize, useNewConvo, useShiftKey } from '~/hooks';
 import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import { NotificationSeverity } from '~/common';
 import { ConvoOptions } from './ConvoOptions';
@@ -46,12 +46,15 @@ export default function Conversation({
   }, [conversationsData]);
 
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
+  const isShiftHeld = useShiftKey();
   const { conversationId, title = '' } = conversation;
   const quickArchiveEnabled = startupConfig?.quickArchiveConversations === true;
 
   const [titleInput, setTitleInput] = useState(title || '');
   const [renaming, setRenaming] = useState(false);
   const [isPopoverActive, setIsPopoverActive] = useState(false);
+  // Lazy-load ConvoOptions to avoid running heavy hooks for all conversations
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   const previousTitle = useRef(title);
 
@@ -175,6 +178,12 @@ export default function Conversation({
     setRenaming(false);
   };
 
+  const handleMouseEnter = useCallback(() => {
+    if (!hasInteracted) {
+      setHasInteracted(true);
+    }
+  }, [hasInteracted]);
+
   const handleNavigation = (ctrlOrMetaKey: boolean) => {
     if (ctrlOrMetaKey) {
       toggleNav();
@@ -223,6 +232,8 @@ export default function Conversation({
       aria-label={localize('com_ui_conversation_label', {
         title: title || localize('com_ui_untitled'),
       })}
+      onMouseEnter={handleMouseEnter}
+      onFocus={handleMouseEnter}
       onClick={(e) => {
         if (renaming) {
           return;
@@ -298,8 +309,9 @@ export default function Conversation({
         className={cn(
           'mr-2 flex origin-left gap-1',
           isPopoverActive || isActiveConvo
-            ? 'pointer-events-auto max-w-[60px] scale-x-100 opacity-100'
+            ? 'pointer-events-auto scale-x-100 opacity-100'
             : 'pointer-events-none max-w-0 scale-x-0 opacity-0 group-focus-within:pointer-events-auto group-focus-within:max-w-[60px] group-focus-within:scale-x-100 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:max-w-[60px] group-hover:scale-x-100 group-hover:opacity-100',
+          (isPopoverActive || isActiveConvo) && (isShiftHeld ? 'max-w-[60px]' : quickArchiveEnabled ? 'max-w-[60px]' : 'max-w-[28px]'),
         )}
         // Removing aria-hidden to fix accessibility issue: ARIA hidden element must not be focusable or contain focusable elements
         // but not sure what its original purpose was, so leaving the property commented out until it can be cleared safe to delete.
@@ -315,7 +327,8 @@ export default function Conversation({
             <ArchiveIcon className="h-4 w-4" />
           </button>
         )}
-        {!renaming && <ConvoOptions {...convoOptionsProps} />}
+        {/* Only render ConvoOptions when user interacts (hover/focus) or for active conversation */}
+        {!renaming && (hasInteracted || isActiveConvo) && <ConvoOptions {...convoOptionsProps} />}
       </div>
     </div>
   );
