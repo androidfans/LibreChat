@@ -2,45 +2,34 @@ version: 1.1.4
 cache: true
 endpoints:
   custom:
-    - name: "POE"
-      apiKey: "${POE_KEY}"
-      # baseURL: "http://host.docker.internal:39527/v1"
-      baseURL: "https://api.poe.com/v1"
+    - name: "OpenRouter"
+      # For `apiKey` and `baseURL`, you can use environment variables that you define.
+      # recommended environment variables:
+      apiKey: "${OPENROUTER_KEY}" # NOT OPENROUTER_API_KEY
+      # baseURL: "http://host.docker.internal:39527/v1" # 可改为你的自建/代理 OpenAI 兼容服务
+      baseURL: "https://openrouter.ai/api/v1"
       models:
         default: [
-          "Gemini-2.5-Flash",
-          "Gemini-2.5-Pro",
-          "Gemini-3-Pro",
-          "GPT-4o",
-          "GPT-4.1-nano",
-          "GPT-4.1-mini",
-          "GPT-4.1",
-          "DeepSeek-V3",
-          "Claude-Sonnet-4.5",
-          "Claude-Sonnet-4",
-          "Claude-Sonnet-3.7",
-          "Claude-Sonnet-3.7-Reasoning",
-          "Claude-Sonnet-3.5",
-          "imitation_writing",
-          "short_video_analyzis",
-          "script_write_twice",
+          "google/gemini-2.5-pro",
+          "anthropic/claude-sonnet-4.5",
+          "openai/gpt-4.1",
         ]
-        fetch: true # 走api获取模型列表, 自建服务器没实现这个功能, 官方api可以打开
+        fetch: true # 走api获取模型列表; 若服务端不支持可设为 false
       titleConvo: true  # 是否生成对话标题
-      titleModel: "GPT-4.1-mini" # 用来生成标题的模型, 不要用 Gemini-2.0-Flash模型 在默认prompt下会返回多余的 related search, 导致UI显示异常
-      titleMethod: "completion" # function 或 completion, function是调用函数生成标题, completion是解析对话用模型生成标题
+      titleModel: "openai/gpt-4.1" # 用来生成标题的模型, 不要用 Gemini-2.0-Flash模型 在默认prompt下会返回多余的 related search, 导致UI显示异常
+      # titleMethod: "completion" # function 或 completion, function是调用函数生成标题, completion是解析对话用模型生成标题
       summarize: true
-      summaryModel: "GPT-4.1-mini"
-      forcePrompt: false # 一般false，为true的话 1. 会去请求 /completion 而不是 /chat/completion 2. 请求体里的messages字段改名为prompt,值为所有消息的合并
-      modelDisplayLabel: "POE"
-      titleMessageRole: "system" # 生成标题的请求role值, 默认为system. POE的Gemini系列模型因为有bug, 会忽略system消息, 这里改为user
+      summaryModel: "openai/gpt-4.1"
+      # forcePrompt: false # 一般false; 为true时 1) 请求 /completion 而不是 /chat/completion 2) 请求体 messages 改为 prompt(所有消息合并)
+      # titleMessageRole: "system" # 生成标题的请求role值, 默认为system; 若模型会忽略system消息可改为user
       # addParams: # 服务商需要的额外参数
         # endpoint_api_specific_key: ""
-      # dropParams: # 去掉一些参数, 以满足服务商的api特殊要求
-        # - "stop"
+      # Recommended: Drop the stop parameter from the request as Openrouter models use a variety of stop tokens.
+      dropParams: ["stop"]
       # headers: # 额外的请求头
         # Content-Type: "application/json"
       # directEndpoint: false # 为true的话, 直接使用这个endpoint的url, 不会拼接成 /chat/completion 的url, 例如: http://host.docker.internal:39527/v1/chat/completion
+      modelDisplayLabel: "OpenRouter"
 
     - name: "laitool-mjrelax"
       apiKey: "${LAITOOL_MJRELAX_KEY}"
@@ -74,26 +63,6 @@ endpoints:
       summaryModel: "gpt-4.1-mini"
       modelDisplayLabel: "来推官转"
 
-    - name: "OpenRouter"
-      # For `apiKey` and `baseURL`, you can use environment variables that you define.
-      # recommended environment variables:
-      apiKey: "${OPENROUTER_KEY}" # NOT OPENROUTER_API_KEY
-      baseURL: "https://openrouter.ai/api/v1"
-      models:
-        default: [
-          "google/gemini-2.5-pro",
-          "anthropic/claude-sonnet-4.5",
-          "openai/gpt-4.1",
-        ]
-        fetch: true
-      titleConvo: true
-      titleModel: "openai/gpt-4.1"
-      summarize: true
-      summaryModel: "openai/gpt-4.1"
-      # Recommended: Drop the stop parameter from the request as Openrouter models use a variety of stop tokens.
-      dropParams: ["stop"]
-      modelDisplayLabel: "OpenRouter"
-
     - name: "copilot"
       apiKey: "dummy"
       baseURL: "http://host.docker.internal:4141/v1/"
@@ -121,93 +90,12 @@ modelSpecs:
     # agents 是助手, 不写就看不见助手了
     - agents
     - smallai
-    - POE
+    - OpenRouter
     - laitool-mjrelax 
     - laitool-official 
     - google-official
-    - OpenRouter
     - copilot
   list:
-    - name: "poe-Gemini-2.5-Flash"
-      # 显示名称
-      label: "POE Gemini-2.5-Flash"
-      default: false # 是否默认选中
-      description: "POE Gemini-2.5-Flash 模型"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      preset:
-        endpoint: "POE"  # 对应上面定义的或者预置的端点名称
-        model: "Gemini-2.5-Flash"  # 发送的请求里的模型名称
-        maxContextTokens: 99999999 # 默认值一般为4096, 会导致超长消息被丢弃一些
-        # temperature: 0.7 # POE 默认0.5, 不设置应该默认0.7
-        # max_tokens: 9999999 # 一般来说, max_tokens 的设置不会影响大模型的生成过程，如果模型生成的 Token 数超过max_tokens，本次请求会返回截断后的内容。
-        # modelLabel: "POE Gemini-2.0-Flash"  # 区别上面定义的model, 这里的modelLabel AI 可以在上下文感知到
-        # greeting: "你好，我是POE Gemini-2.0-Flash" #显示在UI界面上的问候语, 可以教用户怎么使用
-        # promptPrefix: "As a financial advisor, ..." # 会添加在发给AI的每一条消息前面, 作为提示语
-        # resendFiles: false # 非持久对话下, 是否重新发送文件, 默认false
-   
-    - name: "poe-Gemini-2.5-Pro"
-      label: "POE Gemini-2.5-Pro"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      description: "POE Gemini-2.5-Pro 模型"
-      preset:
-        endpoint: "POE"
-        model: "Gemini-2.5-Pro"
-        maxContextTokens: 99999999
-
-    - name: "poe-Gemini-3-Pro"
-      label: "POE Gemini-3-Pro"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      description: "POE Gemini-3-Pro 模型"
-      preset:
-        endpoint: "POE"
-        model: "Gemini-3-Pro"
-        maxContextTokens: 99999999
-   
-    - name: "poe-GPT-4o"
-      label: "POE GPT-4o"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      description: "POE GPT-4o 模型"
-      preset:
-        endpoint: "POE"
-        model: "GPT-4o"
-        maxContextTokens: 99999999
-   
-    - name: "poe-GPT-4.1-nano"
-      label: "POE GPT-4.1-nano"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      description: "POE GPT-4.1-nano 模型"
-      preset:
-        endpoint: "POE"
-        model: "GPT-4.1-nano"
-        maxContextTokens: 99999999
-
-    - name: "poe-GPT-4.1"
-      label: "POE GPT-4.1"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      description: "POE GPT-4.1 模型, 228分"
-      preset:
-        endpoint: "POE"
-        model: "GPT-4.1"
-        maxContextTokens: 99999999
-   
-    - name: "poe-GPT-4.1-mini"
-      label: "POE GPT-4.1-mini"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      description: "POE GPT-4.1-mini 模型, 38分"
-      preset:
-        endpoint: "POE"
-        model: "GPT-4.1-mini"
-        maxContextTokens: 99999999
-
-    - name: "poe-Claude-Sonnet-4.5"
-      label: "POE Claude-4.5"
-      iconURL: "https://psc2.cf2.poecdn.net/assets/_next/static/media/poeSymbolMultibot.202ca782.svg"
-      description: "POE Claude-4.5 模型"
-      preset:
-        endpoint: "POE"
-        model: "Claude-4.5"
-        maxContextTokens: 99999999
-   
     - name: "laitool-deepseek-chat"
       label: "来推 DeepSeek Chat"
       iconURL: "https://laitool.cc/favicon.ico"
@@ -242,4 +130,40 @@ modelSpecs:
       preset:
         endpoint: "laitool-official"
         model: "claude-3-7-sonnet-20250219"
+        maxContextTokens: 99999999
+
+    - name: "copilot-gemini-3-pro-preview"
+      label: "Copilot Gemini 3 Pro"
+      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "gemini-3-pro-preview"
+        maxContextTokens: 99999999
+
+    - name: "copilot-gemini-3-flash-preview"
+      label: "Copilot Gemini 3 flash"
+      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "gemini-3-flash-preview"
+        maxContextTokens: 99999999
+
+    - name: "copilot-claude-sonnet-4.5"
+      label: "Copilot Claude Sonnet 4.5"
+      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "claude-sonnet-4.5"
+        maxContextTokens: 99999999
+
+    - name: "copilot-claude-opus-4.5"
+      label: "Copilot Claude Opus 4.5"
+      iconURL: "https://uxwing.com/wp-content/themes/uxwing/download/brands-and-social-media/github-copilot-icon.png"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "claude-opus-4.5"
         maxContextTokens: 99999999
