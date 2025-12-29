@@ -1,3 +1,4 @@
+import { useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TMessageProps } from '~/common';
 import { cn } from '~/utils';
@@ -9,6 +10,21 @@ export default function SiblingSwitch({
   siblingCount,
   setSiblingIdx,
 }: TSiblingSwitchProps) {
+  const containerRef = useRef<HTMLElement>(null);
+
+  const scrollToMessage = useCallback(() => {
+    // 延迟执行，等待新消息渲染完成
+    setTimeout(() => {
+      const messageContainer = containerRef.current?.closest('.message-render');
+      if (messageContainer) {
+        messageContainer.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }
+    }, 50);
+  }, []);
+
   if (siblingIdx === undefined) {
     return null;
   } else if (siblingCount === undefined) {
@@ -17,10 +33,12 @@ export default function SiblingSwitch({
 
   const previous = () => {
     setSiblingIdx && setSiblingIdx(siblingIdx - 1);
+    scrollToMessage();
   };
 
   const next = () => {
     setSiblingIdx && setSiblingIdx(siblingIdx + 1);
+    scrollToMessage();
   };
 
   const buttonStyle = cn(
@@ -32,6 +50,7 @@ export default function SiblingSwitch({
 
   return siblingCount > 1 ? (
     <nav
+      ref={containerRef}
       className="visible flex items-center justify-center gap-2 self-center pt-0 text-xs"
       aria-label="Sibling message navigation"
     >
