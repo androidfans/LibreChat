@@ -96,42 +96,6 @@ modelSpecs:
     - google-official
     - copilot
   list:
-    - name: "laitool-deepseek-chat"
-      label: "来推 DeepSeek Chat"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "deepseek-chat"
-      preset:
-        endpoint: "laitool-mjrelax"
-        model: "deepseek-chat"
-        maxContextTokens: 99999999
-   
-    - name: "laitool-gemini-2.5-flash"
-      label: "来推 Gemini-2.5-flash"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "gemini-2.5-flash"
-      preset:
-        endpoint: "laitool-mjrelax"
-        model: "gemini-2.5-flash"
-        maxContextTokens: 99999999
-   
-    - name: "laitool-gemini-2.5-pro"
-      label: "来推 Gemini-2.5-pro"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "gemini-2.5-pro"
-      preset:
-        endpoint: "laitool-mjrelax"
-        model: "gemini-2.5-pro"
-        maxContextTokens: 99999999
-   
-    - name: "laitool-claude-3-7-sonnet-20250219"
-      label: "来推官转 Claude 3.7 Sonnet"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "claude-3-7-sonnet-20250219"
-      preset:
-        endpoint: "laitool-official"
-        model: "claude-3-7-sonnet-20250219"
-        maxContextTokens: 99999999
-
     - name: "copilot-gemini-2.5-pro"
       label: "Copilot Gemini 2.5 Pro"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
@@ -139,6 +103,7 @@ modelSpecs:
       preset:
         endpoint: "copilot"
         model: "gemini-2.5-pro"
+        modelLabel: "Copilot Gemini 2.5 Pro" # 这个是模型回消息的时候头像旁边显示的名字
         maxContextTokens: 99999999
 
     - name: "copilot-gemini-3-pro-preview"
@@ -148,15 +113,17 @@ modelSpecs:
       preset:
         endpoint: "copilot"
         model: "gemini-3-pro-preview"
+        modelLabel: "Copilot Gemini 3 Pro"
         maxContextTokens: 99999999
 
     - name: "copilot-gemini-3-flash-preview"
-      label: "Copilot Gemini 3 flash"
+      label: "Copilot Gemini 3 Flash"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
         model: "gemini-3-flash-preview"
+        modelLabel: "Copilot Gemini 3 Flash"
         maxContextTokens: 99999999
 
     - name: "copilot-claude-sonnet-4.5"
@@ -166,6 +133,7 @@ modelSpecs:
       preset:
         endpoint: "copilot"
         model: "claude-sonnet-4.5"
+        modelLabel: "Copilot Claude Sonnet 4.5"
         maxContextTokens: 99999999
 
     - name: "copilot-claude-opus-4.5"
@@ -175,4 +143,44 @@ modelSpecs:
       preset:
         endpoint: "copilot"
         model: "claude-opus-4.5"
+        modelLabel: "Copilot Claude Opus 4.5"
+        maxContextTokens: 99999999
+    - name: "laitool-deepseek-chat"
+      label: "来推 DeepSeek Chat"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "deepseek-chat"
+      preset:
+        endpoint: "laitool-mjrelax"
+        model: "deepseek-chat"
+        modelLabel: "来推 DeepSeek Chat"
+        maxContextTokens: 99999999
+
+    - name: "laitool-gemini-2.5-flash"
+      label: "来推 Gemini-2.5-flash"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "gemini-2.5-flash"
+      preset:
+        endpoint: "laitool-mjrelax"
+        model: "gemini-2.5-flash"
+        modelLabel: "来推 Gemini 2.5 Flash"
+        maxContextTokens: 99999999
+
+    - name: "laitool-gemini-2.5-pro"
+      label: "来推 Gemini-2.5-pro"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "gemini-2.5-pro"
+      preset:
+        endpoint: "laitool-mjrelax"
+        model: "gemini-2.5-pro"
+        modelLabel: "来推 Gemini 2.5 Pro"
+        maxContextTokens: 99999999
+
+    - name: "laitool-claude-3-7-sonnet-20250219"
+      label: "来推官转 Claude 3.7 Sonnet"
+      iconURL: "https://laitool.cc/favicon.ico"
+      description: "claude-3-7-sonnet-20250219"
+      preset:
+        endpoint: "laitool-official"
+        model: "claude-3-7-sonnet-20250219"
+        modelLabel: "来推官转 Claude 3.7 Sonnet"
         maxContextTokens: 99999999
