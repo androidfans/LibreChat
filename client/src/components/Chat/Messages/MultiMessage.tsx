@@ -1,5 +1,5 @@
 import { useRecoilState } from 'recoil';
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { isAssistantsEndpoint } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import type { TMessageProps } from '~/common';
@@ -16,6 +16,7 @@ export default function MultiMessage({
   setCurrentEditId,
 }: TMessageProps) {
   const [siblingIdx, setSiblingIdx] = useRecoilState(store.messagesSiblingIdxFamily(messageId));
+  const prevLengthRef = useRef<number | undefined>(undefined);
 
   const setSiblingIdxRev = useCallback(
     (value: number) => {
@@ -25,8 +26,13 @@ export default function MultiMessage({
   );
 
   useEffect(() => {
-    // reset siblingIdx when the tree changes, mostly when a new message is submitting.
-    setSiblingIdx(0);
+    // Only reset siblingIdx when the tree grows (new message submitting),
+    // not when switching back to a conversation (which preserves the previous sibling state)
+    const currentLength = messagesTree?.length ?? 0;
+    if (prevLengthRef.current !== undefined && currentLength > prevLengthRef.current) {
+      setSiblingIdx(0);
+    }
+    prevLengthRef.current = currentLength;
   }, [messagesTree?.length, setSiblingIdx]);
 
   useEffect(() => {
