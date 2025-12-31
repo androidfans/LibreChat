@@ -71,6 +71,7 @@ endpoints:
           "gemini-3-pro-preview",
           "gemini-2.5-pro",
           "gpt-4.1",
+          "gpt-5.2",
           "claude-sonnet-4.5",
         ]
         fetch: true
@@ -145,6 +146,27 @@ modelSpecs:
         model: "claude-opus-4.5"
         modelLabel: "Copilot Claude Opus 4.5"
         maxContextTokens: 99999999
+
+    - name: "copilot-gpt-4.1"
+      label: "Copilot GPT 4.1"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "gpt-4.1"
+        modelLabel: "Copilot GPT 4.1"
+        maxContextTokens: 99999999
+
+    - name: "copilot-gpt-5.2"
+      label: "Copilot GPT 5.2"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "gpt-5.2"
+        modelLabel: "Copilot GPT 5.2"
+        maxContextTokens: 99999999
+
     - name: "laitool-deepseek-chat"
       label: "来推 DeepSeek Chat"
       iconURL: "https://laitool.cc/favicon.ico"
