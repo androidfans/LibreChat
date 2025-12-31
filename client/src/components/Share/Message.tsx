@@ -109,6 +109,7 @@ export default function Message(props: TMessageProps) {
                   siblingIdx={siblingIdx}
                   siblingCount={siblingCount}
                   setSiblingIdx={setSiblingIdx}
+                  scrollKey={message.parentMessageId ?? conversation?.conversationId}
                 />
                 <MinimalHoverButtons message={message} searchResults={searchResults} />
               </SubRow>

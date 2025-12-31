@@ -170,6 +170,7 @@ const ContentRender = memo(
                   siblingIdx={siblingIdx}
                   siblingCount={siblingCount}
                   setSiblingIdx={setSiblingIdx}
+                  scrollKey={msg.parentMessageId ?? conversation?.conversationId}
                 />
                 <HoverButtons
                   index={index}
