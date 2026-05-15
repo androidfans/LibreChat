@@ -31,48 +31,22 @@ endpoints:
       # directEndpoint: false # 为true的话, 直接使用这个endpoint的url, 不会拼接成 /chat/completion 的url, 例如: http://host.docker.internal:39527/v1/chat/completion
       modelDisplayLabel: "OpenRouter"
 
-    - name: "laitool-mjrelax"
-      apiKey: "${LAITOOL_MJRELAX_KEY}"
-      baseURL: "https://laitool.cc/v1/"
-      models:
-        default: [
-          "deepseek-chat",
-          "gemini-2.5-flash",
-          "gemini-2.5-pro",
-        ]
-        fetch: false
-      titleConvo: true
-      titleModel: "deepseek-chat"
-      summarize: true
-      summaryModel: "deepseek-chat"
-      modelDisplayLabel: "来推"
-   
-    - name: "laitool-official"
-      apiKey: "${LAITOOL_OFFICIAL_KEY}"
-      baseURL: "https://laitool.cc/v1/"
-      models:
-        default: [
-          "claude-sonnet-4-5-20250929",
-          "claude-sonnet-4-5-20250929-thinking", 
-          "gpt-4.1-mini"
-        ]
-        fetch: true # fetching list of models is not supported
-      titleConvo: true
-      titleModel: "gpt-4.1-mini"
-      summarize: true
-      summaryModel: "gpt-4.1-mini"
-      modelDisplayLabel: "来推官转"
-
     - name: "copilot"
       apiKey: "dummy"
       baseURL: "http://host.docker.internal:4141/v1/"
       models:
         default: [
-          "gemini-3-pro-preview",
           "gemini-2.5-pro",
+          "gemini-3.1-pro-preview",
           "gpt-4.1",
           "gpt-5.2",
+          "gpt-5.5",
           "claude-sonnet-4.5",
+          "claude-sonnet-4.6",
+          "claude-opus-4.5",
+          "claude-opus-4.6",
+          "claude-opus-4.7",
+          "gemini-3-flash-preview",
         ]
         fetch: true
       titleConvo: true
@@ -80,7 +54,7 @@ endpoints:
       summarize: true
       summaryModel: "gpt-4.1"
       modelDisplayLabel: "Copilot逆向API"
- 
+
 # modelSpecs节点存在，UI将不再显示预置模型和上面定义的default models, 仅显示model_specs中定义的模型和 addedEndpoints 的endpoints
 modelSpecs:
   # 配置说明 https://www.librechat.ai/docs/configuration/librechat_yaml/object_structure/model_specs
@@ -90,11 +64,8 @@ modelSpecs:
     # 预置 可用 value： agents, openAI, azureOpenAI, google, anthropic, assistants, azureAssistants, bedrock
     # agents 是助手, 不写就看不见助手了
     - agents
-    - smallai
-    - OpenRouter
-    - laitool-mjrelax 
-    - laitool-official 
     - google-official
+    - OpenRouter
     - copilot
   list:
     - name: "copilot-gemini-2.5-pro"
@@ -107,14 +78,14 @@ modelSpecs:
         modelLabel: "Copilot Gemini 2.5 Pro" # 这个是模型回消息的时候头像旁边显示的名字
         maxContextTokens: 99999999
 
-    - name: "copilot-gemini-3-pro-preview"
-      label: "Copilot Gemini 3 Pro"
+    - name: "copilot-gemini-3.1-pro-preview"
+      label: "Copilot Gemini 3.1 Pro"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "gemini-3-pro-preview"
-        modelLabel: "Copilot Gemini 3 Pro"
+        model: "gemini-3.1-pro-preview"
+        modelLabel: "Copilot Gemini 3.1 Pro"
         maxContextTokens: 99999999
 
     - name: "copilot-gemini-3-flash-preview"
@@ -147,6 +118,36 @@ modelSpecs:
         modelLabel: "Copilot Claude Opus 4.5"
         maxContextTokens: 99999999
 
+    - name: "copilot-claude-sonnet-4.6"
+      label: "Copilot Claude Sonnet 4.6"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "claude-sonnet-4.6"
+        modelLabel: "Copilot Claude Sonnet 4.6"
+        maxContextTokens: 99999999
+
+    - name: "copilot-claude-opus-4.6"
+      label: "Copilot Claude Opus 4.6"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "claude-opus-4.6"
+        modelLabel: "Copilot Claude Opus 4.6"
+        maxContextTokens: 99999999
+
+    - name: "copilot-claude-opus-4.7"
+      label: "Copilot Claude Opus 4.7"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "claude-opus-4.7"
+        modelLabel: "Copilot Claude Opus 4.7"
+        maxContextTokens: 99999999
+
     - name: "copilot-gpt-4.1"
       label: "Copilot GPT 4.1"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
@@ -167,42 +168,12 @@ modelSpecs:
         modelLabel: "Copilot GPT 5.2"
         maxContextTokens: 99999999
 
-    - name: "laitool-deepseek-chat"
-      label: "来推 DeepSeek Chat"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "deepseek-chat"
+    - name: "copilot-gpt-5.5"
+      label: "Copilot GPT 5.5"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
       preset:
-        endpoint: "laitool-mjrelax"
-        model: "deepseek-chat"
-        modelLabel: "来推 DeepSeek Chat"
-        maxContextTokens: 99999999
-
-    - name: "laitool-gemini-2.5-flash"
-      label: "来推 Gemini-2.5-flash"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "gemini-2.5-flash"
-      preset:
-        endpoint: "laitool-mjrelax"
-        model: "gemini-2.5-flash"
-        modelLabel: "来推 Gemini 2.5 Flash"
-        maxContextTokens: 99999999
-
-    - name: "laitool-gemini-2.5-pro"
-      label: "来推 Gemini-2.5-pro"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "gemini-2.5-pro"
-      preset:
-        endpoint: "laitool-mjrelax"
-        model: "gemini-2.5-pro"
-        modelLabel: "来推 Gemini 2.5 Pro"
-        maxContextTokens: 99999999
-
-    - name: "laitool-claude-3-7-sonnet-20250219"
-      label: "来推官转 Claude 3.7 Sonnet"
-      iconURL: "https://laitool.cc/favicon.ico"
-      description: "claude-3-7-sonnet-20250219"
-      preset:
-        endpoint: "laitool-official"
-        model: "claude-3-7-sonnet-20250219"
-        modelLabel: "来推官转 Claude 3.7 Sonnet"
+        endpoint: "copilot"
+        model: "gpt-5.5"
+        modelLabel: "Copilot GPT 5.5"
         maxContextTokens: 99999999
