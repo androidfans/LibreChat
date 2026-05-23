@@ -103,10 +103,20 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   // );
 
   const setSubmission = useSetRecoilState(store.submissionByIndex(index));
-  const getCurrentActiveStreamId = useRecoilCallback(
+  const getCurrentStopTarget = useRecoilCallback(
     ({ snapshot }) =>
-      async () =>
-        snapshot.getPromise(store.activeStreamIdFamily(index)),
+      async () => {
+        const [currentSubmission, currentActiveStreamId] = await Promise.all([
+          snapshot.getPromise(store.submissionByIndex(index)),
+          snapshot.getPromise(store.activeStreamIdFamily(index)),
+        ]);
+
+        return {
+          activeStreamId: currentActiveStreamId,
+          userMessageId: currentSubmission?.userMessage?.messageId,
+          initialResponseId: currentSubmission?.initialResponse?.messageId,
+        };
+      },
     [index],
   );
   const clearSubmissionIfCurrent = useRecoilCallback(
@@ -114,10 +124,14 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       async ({
         conversationId: expectedConversationId,
         streamId: expectedStreamId,
+        userMessageId: expectedUserMessageId,
+        initialResponseId: expectedInitialResponseId,
         allowPendingNew,
       }: {
         conversationId?: string;
         streamId?: string | null;
+        userMessageId?: string;
+        initialResponseId?: string;
         allowPendingNew?: boolean;
       }) => {
         const [currentSubmission, currentActiveStreamId] = await Promise.all([
@@ -130,18 +144,29 @@ export default function useChatHelpers(index = 0, paramId?: string) {
 
         const currentConversationId = currentSubmission.conversation?.conversationId;
         const currentUserMessageConversationId = currentSubmission.userMessage?.conversationId;
+        const currentUserMessageId = currentSubmission.userMessage?.messageId;
+        const currentInitialResponseId = currentSubmission.initialResponse?.messageId;
         const currentStreamId = (currentSubmission as TSubmission & { resumeStreamId?: string })
           .resumeStreamId;
+        const hasExpectedSubmissionIdentity =
+          expectedUserMessageId != null || expectedInitialResponseId != null;
+        const matchesSubmissionIdentity =
+          (expectedUserMessageId != null && currentUserMessageId === expectedUserMessageId) ||
+          (expectedInitialResponseId != null &&
+            currentInitialResponseId === expectedInitialResponseId);
         const isPendingNewSubmission =
           currentConversationId == null &&
           currentUserMessageConversationId == null &&
           currentActiveStreamId == null;
         const matchesPendingNew =
           isPendingNewSubmission &&
+          hasExpectedSubmissionIdentity &&
+          matchesSubmissionIdentity &&
           (expectedConversationId === Constants.NEW_CONVO ||
             (allowPendingNew === true && expectedConversationId != null));
         const matchesConversation =
           expectedConversationId != null &&
+          (!hasExpectedSubmissionIdentity || matchesSubmissionIdentity) &&
           (currentConversationId === expectedConversationId ||
             currentUserMessageConversationId === expectedConversationId);
         const matchesStream =
@@ -158,9 +183,13 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         logger.debug('conversation', '[useChatHelpers] Skipping stale stop cleanup', {
           expectedConversationId,
           expectedStreamId,
+          expectedUserMessageId,
+          expectedInitialResponseId,
           allowPendingNew,
           currentConversationId,
           currentUserMessageConversationId,
+          currentUserMessageId,
+          currentInitialResponseId,
           currentStreamId,
           currentActiveStreamId,
         });
@@ -220,7 +249,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       isAssistants,
     });
     setStopGenerationRequest((requestId) => requestId + 1);
-    const streamIdToAbort = activeStreamId ?? (await getCurrentActiveStreamId());
+    const stopTarget = await getCurrentStopTarget();
+    const streamIdToAbort = activeStreamId ?? stopTarget.activeStreamId;
 
     // For non-assistants endpoints (using resumable streams), call abort endpoint first
     const abortConversationId =
@@ -247,6 +277,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         await clearSubmissionIfCurrent({
           conversationId: stopConversationId,
           streamId: streamIdToAbort,
+          userMessageId: stopTarget.userMessageId,
+          initialResponseId: stopTarget.initialResponseId,
           allowPendingNew: true,
         });
       } catch (error) {
@@ -254,6 +286,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         await clearSubmissionIfCurrent({
           conversationId: stopConversationId,
           streamId: streamIdToAbort,
+          userMessageId: stopTarget.userMessageId,
+          initialResponseId: stopTarget.initialResponseId,
           allowPendingNew: true,
         });
       }
@@ -267,6 +301,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       await clearSubmissionIfCurrent({
         conversationId: stopConversationId,
         streamId: streamIdToAbort,
+        userMessageId: stopTarget.userMessageId,
+        initialResponseId: stopTarget.initialResponseId,
         allowPendingNew: true,
       });
     }
@@ -277,7 +313,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     endpointType,
     abortMutation,
     clearSubmissionIfCurrent,
-    getCurrentActiveStreamId,
+    getCurrentStopTarget,
     queryClient,
     setStopGenerationRequest,
   ]);

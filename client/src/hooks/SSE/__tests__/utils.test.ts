@@ -1,5 +1,10 @@
 import type { TMessage } from 'librechat-data-provider';
-import { filterOptimisticSubmissionMessages, upsertResponseMessage } from '../utils';
+import {
+  filterOptimisticSubmissionMessages,
+  upsertCancelledMessages,
+  upsertPersistedRequestMessage,
+  upsertResponseMessage,
+} from '../utils';
 
 const message = (overrides: Partial<TMessage>): TMessage =>
   ({
@@ -79,6 +84,88 @@ describe('filterOptimisticSubmissionMessages', () => {
       },
       responseMessageId: 'persisted-response',
       userMessageId: 'optimistic-user',
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual(['root']);
+  });
+});
+
+describe('upsertCancelledMessages', () => {
+  it('replaces optimistic turn messages with cancelled persisted messages', () => {
+    const requestMessage = message({ messageId: 'persisted-user', text: 'stop me' });
+    const responseMessage = message({
+      messageId: 'persisted-response',
+      parentMessageId: 'persisted-user',
+      isCreatedByUser: false,
+      text: 'cancelled',
+    });
+
+    const result = upsertCancelledMessages({
+      messages: [
+        message({ messageId: 'root' }),
+        message({ messageId: 'optimistic-user', text: 'stop me' }),
+        message({ messageId: 'optimistic-response', parentMessageId: 'optimistic-user' }),
+        message({ messageId: 'persisted-response', parentMessageId: 'persisted-user' }),
+      ],
+      requestMessage,
+      responseMessage,
+      submission: {
+        userMessage: { messageId: 'optimistic-user', responseMessageId: 'optimistic-user_' },
+        initialResponse: { messageId: 'optimistic-response' },
+      },
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual([
+      'root',
+      'persisted-user',
+      'persisted-response',
+    ]);
+  });
+
+  it('keeps the existing user message in place when regenerating a cancelled response', () => {
+    const requestMessage = message({ messageId: 'existing-user' });
+    const responseMessage = message({
+      messageId: 'new-response',
+      parentMessageId: 'existing-user',
+      isCreatedByUser: false,
+      text: 'cancelled',
+    });
+
+    const result = upsertCancelledMessages({
+      messages: [
+        message({ messageId: 'root' }),
+        requestMessage,
+        message({ messageId: 'old-response_', parentMessageId: 'existing-user' }),
+      ],
+      requestMessage,
+      responseMessage,
+      submission: {
+        userMessage: { messageId: 'existing-user', responseMessageId: 'old-response_' },
+        initialResponse: { messageId: 'old-response_' },
+      },
+      isRegenerate: true,
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual(['root', 'existing-user', 'new-response']);
+  });
+});
+
+describe('upsertPersistedRequestMessage', () => {
+  it('appends a persisted request message to the submitted base messages', () => {
+    const requestMessage = message({ messageId: 'persisted-user', text: 'saved' });
+
+    const result = upsertPersistedRequestMessage({
+      messages: [message({ messageId: 'root' })],
+      requestMessage,
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual(['root', 'persisted-user']);
+  });
+
+  it('does not append a request message without a persisted conversation id', () => {
+    const result = upsertPersistedRequestMessage({
+      messages: [message({ messageId: 'root' })],
+      requestMessage: message({ messageId: 'optimistic-user', conversationId: undefined }),
     });
 
     expect(result.map((msg) => msg.messageId)).toEqual(['root']);

@@ -42,7 +42,12 @@ import useContentHandler from '~/hooks/SSE/useContentHandler';
 import useStepHandler from '~/hooks/SSE/useStepHandler';
 import { useApplyAgentTemplate } from '~/hooks/Agents';
 import { useAuthContext } from '~/hooks/AuthContext';
-import { filterOptimisticSubmissionMessages, upsertResponseMessage } from './utils';
+import {
+  filterOptimisticSubmissionMessages,
+  upsertCancelledMessages,
+  upsertPersistedRequestMessage,
+  upsertResponseMessage,
+} from './utils';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 import { useLiveAnnouncer } from '~/Providers';
 import store from '~/store';
@@ -324,18 +329,15 @@ export default function useEventHandlers({
         (conversation as TConversation | null) ?? (submission.conversation as TConversation);
       const currentMessages = getMessages() ?? messages;
 
-      // update the messages
-      if (isRegenerate) {
-        const messagesUpdate = (
-          [...currentMessages, responseMessage] as Array<TMessage | undefined>
-        ).filter((msg) => msg);
-        setMessages(messagesUpdate as TMessage[]);
-      } else {
-        const messagesUpdate = (
-          [...currentMessages, requestMessage, responseMessage] as Array<TMessage | undefined>
-        ).filter((msg) => msg);
-        setMessages(messagesUpdate as TMessage[]);
-      }
+      setMessages(
+        upsertCancelledMessages({
+          messages: currentMessages,
+          requestMessage,
+          responseMessage,
+          submission,
+          isRegenerate,
+        }),
+      );
 
       const isNewConvo = conversation.conversationId !== submission.conversation.conversationId;
       if (isNewConvo) {
@@ -609,7 +611,10 @@ export default function useEventHandlers({
         /** Handle edge case where stream is cancelled before any response, which creates a blank page */
         if (!conversation.conversationId && hasNoResponse) {
           const currentConvoId =
-            (submissionConvo.conversationId ?? conversation.conversationId) || Constants.NEW_CONVO;
+            requestMessage?.conversationId ??
+            submissionConvo.conversationId ??
+            conversation.conversationId ??
+            Constants.NEW_CONVO;
           if (isNewConvo && submissionConvo.conversationId) {
             removeConvoFromAllQueries(queryClient, submissionConvo.conversationId);
           }
@@ -618,7 +623,11 @@ export default function useEventHandlers({
             location.pathname === `/c/${Constants.NEW_CONVO}` &&
             currentConvoId === Constants.NEW_CONVO;
 
-          setFinalMessages(currentConvoId, isNewChat ? [] : [...baseMessages]);
+          const noResponseMessages = upsertPersistedRequestMessage({
+            messages: submission.messages,
+            requestMessage,
+          });
+          setFinalMessages(currentConvoId, isNewChat ? [] : noResponseMessages);
           restoreSubmittedDraftRecovery({
             submission,
             requestMessage,
