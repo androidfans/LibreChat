@@ -33,8 +33,10 @@ async function resolveDeletionMetadata({ userId, conversationId, thread_id, endp
   }
 
   const [conversation, messages = []] = await Promise.all([
-    getConvo(userId, conversationId),
-    getMessages({ conversationId, user: userId }, 'thread_id endpoint'),
+    endpoint ? Promise.resolve(null) : getConvo(userId, conversationId),
+    thread_id
+      ? Promise.resolve([])
+      : getMessages({ conversationId, user: userId }, 'thread_id endpoint'),
   ]);
   const lastMessage = messages[messages.length - 1];
   const lastThreadMessage = [...messages].reverse().find((message) => message.thread_id);

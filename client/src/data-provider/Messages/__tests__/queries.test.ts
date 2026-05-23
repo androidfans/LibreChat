@@ -68,6 +68,19 @@ describe('getStableMessages', () => {
     expect(result).toBe(serverMessages);
   });
 
+  it('accepts a one-message result when the cache only has one message', () => {
+    const currentMessages = [message({ messageId: 'stale-message' })];
+    const serverMessages = [message({ messageId: 'server-message' })];
+
+    const result = getStableMessages({
+      pathname: '/c/convo-id',
+      result: serverMessages,
+      currentMessages,
+    });
+
+    expect(result).toBe(serverMessages);
+  });
+
   it('does not preserve cache on the new conversation route', () => {
     const currentMessages = [message({ messageId: 'user-1', createdAt: undefined })];
 

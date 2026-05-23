@@ -14,6 +14,7 @@ import { useGetMessagesByConvoId, useAbortStreamMutation } from '~/data-provider
 import useChatFunctions from '~/hooks/Chat/useChatFunctions';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useNewConvo from '~/hooks/useNewConvo';
+import { logger } from '~/utils';
 import store from '~/store';
 
 // this to be set somewhere else
@@ -132,7 +133,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           return;
         }
 
-        console.log('[useChatHelpers] Skipping stale stop cleanup', {
+        logger.debug('conversation', '[useChatHelpers] Skipping stale stop cleanup', {
           expectedConversationId,
           expectedStreamId,
           currentConversationId,
@@ -185,7 +186,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const stopGenerating = useCallback(async () => {
     const actualEndpoint = endpointType ?? endpoint;
     const isAssistants = isAssistantsEndpoint(actualEndpoint);
-    console.log('[useChatHelpers] stopGenerating called', {
+    logger.debug('conversation', '[useChatHelpers] stopGenerating called', {
       conversationId,
       activeStreamId,
       endpoint,
@@ -206,7 +207,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       }));
 
       try {
-        console.log('[useChatHelpers] Calling abort mutation for:', {
+        logger.debug('conversation', '[useChatHelpers] Calling abort mutation for:', {
           streamId: activeStreamId,
           conversationId: abortConversationId,
         });
@@ -214,20 +215,21 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           streamId: activeStreamId ?? undefined,
           conversationId: abortConversationId,
         });
-        console.log('[useChatHelpers] Abort mutation succeeded');
+        logger.debug('conversation', '[useChatHelpers] Abort mutation succeeded');
         await clearSubmissionIfCurrent({
           conversationId: abortConversationId ?? conversationId,
           streamId: activeStreamId,
         });
       } catch (error) {
-        console.error('[useChatHelpers] Abort failed:', error);
+        logger.error('conversation', '[useChatHelpers] Abort failed:', error);
         await clearSubmissionIfCurrent({
           conversationId: abortConversationId ?? conversationId,
           streamId: activeStreamId,
         });
       }
     } else {
-      console.log(
+      logger.debug(
+        'conversation',
         isAssistants
           ? '[useChatHelpers] Assistants endpoint, clearing current submission'
           : '[useChatHelpers] No concrete stream id available, clearing current submission',

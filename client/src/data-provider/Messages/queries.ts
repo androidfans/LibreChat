@@ -31,7 +31,10 @@ export function getStableMessages({
     return result;
   }
 
-  if (result.length === 1 || hasUnhydratedMessage(currentMessages)) {
+  if (
+    (result.length === 1 && currentMessages.length > 1) ||
+    hasUnhydratedMessage(currentMessages)
+  ) {
     return currentMessages;
   }
 
