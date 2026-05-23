@@ -17,6 +17,92 @@ import useNewConvo from '~/hooks/useNewConvo';
 import { logger } from '~/utils';
 import store from '~/store';
 
+type StopSubmissionTarget = {
+  conversationId?: string;
+  streamId?: string | null;
+  userMessageId?: string;
+  initialResponseId?: string;
+  allowPendingNew?: boolean;
+};
+
+type StopSubmissionMatchState = {
+  expectedConversationId?: string;
+  expectedStreamId?: string | null;
+  expectedUserMessageId?: string;
+  expectedInitialResponseId?: string;
+  allowPendingNew?: boolean;
+  currentConversationId?: string | null;
+  currentUserMessageConversationId?: string | null;
+  currentUserMessageId?: string;
+  currentInitialResponseId?: string;
+  currentStreamId?: string;
+  currentActiveStreamId: string | null;
+};
+
+const getStopSubmissionMatchState = ({
+  currentSubmission,
+  currentActiveStreamId,
+  target,
+}: {
+  currentSubmission: TSubmission;
+  currentActiveStreamId: string | null;
+  target: StopSubmissionTarget;
+}): StopSubmissionMatchState => ({
+  expectedConversationId: target.conversationId,
+  expectedStreamId: target.streamId,
+  expectedUserMessageId: target.userMessageId,
+  expectedInitialResponseId: target.initialResponseId,
+  allowPendingNew: target.allowPendingNew,
+  currentConversationId: currentSubmission.conversation?.conversationId,
+  currentUserMessageConversationId: currentSubmission.userMessage?.conversationId,
+  currentUserMessageId: currentSubmission.userMessage?.messageId,
+  currentInitialResponseId: currentSubmission.initialResponse?.messageId,
+  currentStreamId: (currentSubmission as TSubmission & { resumeStreamId?: string }).resumeStreamId,
+  currentActiveStreamId,
+});
+
+const doesSubmissionMatchTarget = ({
+  expectedConversationId,
+  expectedStreamId,
+  expectedUserMessageId,
+  expectedInitialResponseId,
+  allowPendingNew,
+  currentConversationId,
+  currentUserMessageConversationId,
+  currentUserMessageId,
+  currentInitialResponseId,
+  currentStreamId,
+  currentActiveStreamId,
+}: StopSubmissionMatchState) => {
+  const hasExpectedSubmissionIdentity =
+    expectedUserMessageId != null || expectedInitialResponseId != null;
+  const matchesSubmissionIdentity =
+    (expectedUserMessageId != null && currentUserMessageId === expectedUserMessageId) ||
+    (expectedInitialResponseId != null && currentInitialResponseId === expectedInitialResponseId);
+  const isPendingNewSubmission =
+    currentConversationId == null &&
+    currentUserMessageConversationId == null &&
+    currentActiveStreamId == null;
+  const matchesPendingNew =
+    isPendingNewSubmission &&
+    hasExpectedSubmissionIdentity &&
+    matchesSubmissionIdentity &&
+    (expectedConversationId === Constants.NEW_CONVO ||
+      (allowPendingNew === true && expectedConversationId != null));
+  const matchesConversation =
+    expectedConversationId != null &&
+    (!hasExpectedSubmissionIdentity || matchesSubmissionIdentity) &&
+    (currentConversationId === expectedConversationId ||
+      currentUserMessageConversationId === expectedConversationId);
+  const matchesStream =
+    expectedStreamId != null &&
+    (currentStreamId === expectedStreamId ||
+      currentConversationId === expectedStreamId ||
+      currentActiveStreamId === expectedStreamId);
+
+  return matchesPendingNew || matchesConversation || matchesStream;
+};
+
 // this to be set somewhere else
 export default function useChatHelpers(index = 0, paramId?: string) {
   const [files, setFiles] = useRecoilState(store.filesByIndex(index));
@@ -121,19 +207,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   );
   const clearSubmissionIfCurrent = useRecoilCallback(
     ({ snapshot, set }) =>
-      async ({
-        conversationId: expectedConversationId,
-        streamId: expectedStreamId,
-        userMessageId: expectedUserMessageId,
-        initialResponseId: expectedInitialResponseId,
-        allowPendingNew,
-      }: {
-        conversationId?: string;
-        streamId?: string | null;
-        userMessageId?: string;
-        initialResponseId?: string;
-        allowPendingNew?: boolean;
-      }) => {
+      async (target: StopSubmissionTarget) => {
         const [currentSubmission, currentActiveStreamId] = await Promise.all([
           snapshot.getPromise(store.submissionByIndex(index)),
           snapshot.getPromise(store.activeStreamIdFamily(index)),
@@ -142,56 +216,19 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           return;
         }
 
-        const currentConversationId = currentSubmission.conversation?.conversationId;
-        const currentUserMessageConversationId = currentSubmission.userMessage?.conversationId;
-        const currentUserMessageId = currentSubmission.userMessage?.messageId;
-        const currentInitialResponseId = currentSubmission.initialResponse?.messageId;
-        const currentStreamId = (currentSubmission as TSubmission & { resumeStreamId?: string })
-          .resumeStreamId;
-        const hasExpectedSubmissionIdentity =
-          expectedUserMessageId != null || expectedInitialResponseId != null;
-        const matchesSubmissionIdentity =
-          (expectedUserMessageId != null && currentUserMessageId === expectedUserMessageId) ||
-          (expectedInitialResponseId != null &&
-            currentInitialResponseId === expectedInitialResponseId);
-        const isPendingNewSubmission =
-          currentConversationId == null &&
-          currentUserMessageConversationId == null &&
-          currentActiveStreamId == null;
-        const matchesPendingNew =
-          isPendingNewSubmission &&
-          hasExpectedSubmissionIdentity &&
-          matchesSubmissionIdentity &&
-          (expectedConversationId === Constants.NEW_CONVO ||
-            (allowPendingNew === true && expectedConversationId != null));
-        const matchesConversation =
-          expectedConversationId != null &&
-          (!hasExpectedSubmissionIdentity || matchesSubmissionIdentity) &&
-          (currentConversationId === expectedConversationId ||
-            currentUserMessageConversationId === expectedConversationId);
-        const matchesStream =
-          expectedStreamId != null &&
-          (currentStreamId === expectedStreamId ||
-            currentConversationId === expectedStreamId ||
-            currentActiveStreamId === expectedStreamId);
+        const matchState = getStopSubmissionMatchState({
+          currentSubmission,
+          currentActiveStreamId,
+          target,
+        });
 
-        if (matchesPendingNew || matchesConversation || matchesStream) {
+        if (doesSubmissionMatchTarget(matchState)) {
           set(store.submissionByIndex(index), null);
           return;
         }
 
         logger.debug('conversation', '[useChatHelpers] Skipping stale stop cleanup', {
-          expectedConversationId,
-          expectedStreamId,
-          expectedUserMessageId,
-          expectedInitialResponseId,
-          allowPendingNew,
-          currentConversationId,
-          currentUserMessageConversationId,
-          currentUserMessageId,
-          currentInitialResponseId,
-          currentStreamId,
-          currentActiveStreamId,
+          ...matchState,
         });
       },
     [index],

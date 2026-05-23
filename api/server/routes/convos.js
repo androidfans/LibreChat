@@ -39,7 +39,13 @@ async function resolveDeletionMetadata({ userId, conversationId, thread_id, endp
       : getMessages({ conversationId, user: userId }, 'thread_id endpoint'),
   ]);
   const lastMessage = messages[messages.length - 1];
-  const lastThreadMessage = [...messages].reverse().find((message) => message.thread_id);
+  let lastThreadMessage;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].thread_id) {
+      lastThreadMessage = messages[i];
+      break;
+    }
+  }
 
   return {
     thread_id: thread_id ?? lastThreadMessage?.thread_id ?? lastMessage?.thread_id,
