@@ -114,9 +114,11 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       async ({
         conversationId: expectedConversationId,
         streamId: expectedStreamId,
+        allowPendingNew,
       }: {
         conversationId?: string;
         streamId?: string | null;
+        allowPendingNew?: boolean;
       }) => {
         const [currentSubmission, currentActiveStreamId] = await Promise.all([
           snapshot.getPromise(store.submissionByIndex(index)),
@@ -130,11 +132,14 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         const currentUserMessageConversationId = currentSubmission.userMessage?.conversationId;
         const currentStreamId = (currentSubmission as TSubmission & { resumeStreamId?: string })
           .resumeStreamId;
-        const matchesPendingNew =
-          expectedConversationId === Constants.NEW_CONVO &&
+        const isPendingNewSubmission =
           currentConversationId == null &&
           currentUserMessageConversationId == null &&
           currentActiveStreamId == null;
+        const matchesPendingNew =
+          isPendingNewSubmission &&
+          (expectedConversationId === Constants.NEW_CONVO ||
+            (allowPendingNew === true && expectedConversationId != null));
         const matchesConversation =
           expectedConversationId != null &&
           (currentConversationId === expectedConversationId ||
@@ -153,7 +158,9 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         logger.debug('conversation', '[useChatHelpers] Skipping stale stop cleanup', {
           expectedConversationId,
           expectedStreamId,
+          allowPendingNew,
           currentConversationId,
+          currentUserMessageConversationId,
           currentStreamId,
           currentActiveStreamId,
         });
@@ -240,12 +247,14 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         await clearSubmissionIfCurrent({
           conversationId: stopConversationId,
           streamId: streamIdToAbort,
+          allowPendingNew: true,
         });
       } catch (error) {
         logger.error('conversation', '[useChatHelpers] Abort failed:', error);
         await clearSubmissionIfCurrent({
           conversationId: stopConversationId,
           streamId: streamIdToAbort,
+          allowPendingNew: true,
         });
       }
     } else {
@@ -258,6 +267,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       await clearSubmissionIfCurrent({
         conversationId: stopConversationId,
         streamId: streamIdToAbort,
+        allowPendingNew: true,
       });
     }
   }, [

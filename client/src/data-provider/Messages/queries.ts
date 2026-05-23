@@ -13,8 +13,7 @@ type StableMessagesParams = {
 
 function hasUnhydratedMessage(messages: t.TMessage[]) {
   return messages.some((message) => {
-    const messageId = message.messageId ?? '';
-    return message.createdAt == null || message.updatedAt == null || messageId.endsWith('_');
+    return message.createdAt == null || message.updatedAt == null;
   });
 }
 

@@ -68,6 +68,23 @@ describe('getStableMessages', () => {
     expect(result).toBe(serverMessages);
   });
 
+  it('accepts fewer persisted messages when a hydrated message id ends with underscore', () => {
+    const currentMessages = [
+      message({ messageId: 'persisted-1' }),
+      message({ messageId: 'persisted-2_' }),
+      message({ messageId: 'persisted-3' }),
+    ];
+    const serverMessages = [currentMessages[0], currentMessages[2]];
+
+    const result = getStableMessages({
+      pathname: '/c/convo-id',
+      result: serverMessages,
+      currentMessages,
+    });
+
+    expect(result).toBe(serverMessages);
+  });
+
   it('accepts a one-message result when the cache only has one message', () => {
     const currentMessages = [message({ messageId: 'stale-message' })];
     const serverMessages = [message({ messageId: 'server-message' })];
