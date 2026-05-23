@@ -256,6 +256,16 @@ const activeRunFamily = atomFamily<string | null, string | number | null>({
   default: null,
 });
 
+const activeStreamIdFamily = atomFamily<string | null, string | number | null>({
+  key: 'activeStreamIdByIndex',
+  default: null,
+});
+
+const stopGenerationRequestFamily = atomFamily<number, string | number | null>({
+  key: 'stopGenerationRequestByIndex',
+  default: 0,
+});
+
 const audioRunFamily = atomFamily<string | null, string | number | null>({
   key: 'audioRunByIndex',
   default: null,
@@ -417,6 +427,8 @@ export default {
   showMentionPopoverFamily,
   globalAudioURLFamily,
   activeRunFamily,
+  activeStreamIdFamily,
+  stopGenerationRequestFamily,
   audioRunFamily,
   globalAudioPlayingFamily,
   globalAudioFetchingFamily,

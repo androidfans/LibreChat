@@ -14,6 +14,7 @@ const { getConvosByCursor, deleteConvos, getConvo, saveConvo } = require('~/mode
 const { forkConversation, duplicateConversation } = require('~/server/utils/import/fork');
 const { storage, importFileFilter } = require('~/server/routes/files/multer');
 const { deleteAllSharedLinks } = require('~/models');
+const { getMessages } = require('~/models/Message');
 const {
   deleteConversation,
   deleteProviderThread,
@@ -25,6 +26,37 @@ const getLogStores = require('~/cache/getLogStores');
 
 const router = express.Router();
 router.use(requireJwtAuth);
+
+async function resolveDeletionMetadata({ userId, conversationId, thread_id, endpoint }) {
+  if (thread_id && endpoint) {
+    return { thread_id, endpoint };
+  }
+
+  const [conversation, messages = []] = await Promise.all([
+    endpoint ? Promise.resolve(null) : getConvo(userId, conversationId),
+    thread_id
+      ? Promise.resolve([])
+      : getMessages({ conversationId, user: userId }, 'thread_id endpoint'),
+  ]);
+  const lastMessage = messages[messages.length - 1];
+  let lastThreadMessage;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].thread_id) {
+      lastThreadMessage = messages[i];
+      break;
+    }
+  }
+
+  return {
+    thread_id: thread_id ?? lastThreadMessage?.thread_id ?? lastMessage?.thread_id,
+    endpoint:
+      endpoint ??
+      lastThreadMessage?.endpoint ??
+      lastMessage?.endpoint ??
+      conversation?.endpointType ??
+      conversation?.endpoint,
+  };
+}
 
 router.get('/', async (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 25;
@@ -115,12 +147,18 @@ router.delete('/', async (req, res) => {
   try {
     let dbResponse;
     if (filter.conversationId) {
+      const deletionMetadata = await resolveDeletionMetadata({
+        userId: req.user.id,
+        conversationId: filter.conversationId,
+        thread_id,
+        endpoint,
+      });
+
       dbResponse = await deleteConversation({
         req,
         res,
         conversationId: filter.conversationId,
-        thread_id,
-        endpoint,
+        ...deletionMetadata,
       });
     } else {
       await deleteProviderThread({ req, res, endpoint, thread_id });

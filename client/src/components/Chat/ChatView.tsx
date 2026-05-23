@@ -45,6 +45,7 @@ function ChatView({ index = 0 }: { index?: number }) {
   const {
     data: messagesTree = null,
     isFetched,
+    isFetching,
     isLoading,
   } = useGetMessagesByConvoId(conversationId ?? '', {
     select: useCallback(
@@ -69,7 +70,7 @@ function ChatView({ index = 0 }: { index?: number }) {
 
   // Auto-resume if navigating back to conversation with active job
   // Wait for messages to load before resuming to avoid race condition
-  useResumeOnLoad(conversationId, chatHelpers.getMessages, index, !isLoading);
+  useResumeOnLoad(conversationId, chatHelpers.getMessages, index, !isLoading && !isFetching);
 
   const methods = useForm<ChatFormValues>({
     defaultValues: { text: '' },

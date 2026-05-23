@@ -154,7 +154,7 @@ export default function useSSE(
           textIndex = index;
         }
 
-        contentHandler({ data, submission: submission as EventSubmission });
+        contentHandler({ data, submission: { ...submission, userMessage } as EventSubmission });
       } else {
         const text = data.text ?? data.response;
 

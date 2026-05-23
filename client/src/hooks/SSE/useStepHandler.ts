@@ -17,6 +17,7 @@ import type {
 import type { SetterOrUpdater } from 'recoil';
 import type { AnnounceOptions } from '~/common';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
+import { upsertResponseMessage } from './utils';
 
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
@@ -301,18 +302,16 @@ export default function useStepHandler({
 
           // Get fresh messages to handle multi-tab scenarios where messages may have loaded
           // after this handler started (Tab 2 may have more complete history now)
-          const freshMessages = getMessages() || [];
-          const currentMessages = freshMessages.length > messages.length ? freshMessages : messages;
+          const currentMessages = getMessages() ?? messages;
 
-          // Remove any existing response placeholder
-          let updatedMessages = currentMessages.filter((m) => m.messageId !== responseMessageId);
-
-          // Ensure userMessage is present (multi-tab: Tab 2 may not have it yet)
-          if (!updatedMessages.some((m) => m.messageId === userMessage.messageId)) {
-            updatedMessages = [...updatedMessages, userMessage as TMessage];
-          }
-
-          setMessages([...updatedMessages, response]);
+          setMessages(
+            upsertResponseMessage({
+              messages: currentMessages,
+              response,
+              userMessage: userMessage as TMessage,
+              submission,
+            }),
+          );
         }
 
         // Store tool call IDs if present
@@ -344,11 +343,14 @@ export default function useStepHandler({
           });
 
           messageMap.current.set(responseMessageId, updatedResponse);
-          const updatedMessages = messages.map((msg) =>
-            msg.messageId === responseMessageId ? updatedResponse : msg,
+          setMessages(
+            upsertResponseMessage({
+              messages: getMessages() || messages,
+              response: updatedResponse,
+              userMessage: userMessage as TMessage,
+              submission,
+            }),
           );
-
-          setMessages(updatedMessages);
         }
       } else if (event === 'on_agent_update') {
         const { agent_update } = data as Agents.AgentUpdate;
@@ -379,7 +381,14 @@ export default function useStepHandler({
           );
           messageMap.current.set(responseMessageId, updatedResponse);
           const currentMessages = getMessages() || [];
-          setMessages([...currentMessages.slice(0, -1), updatedResponse]);
+          setMessages(
+            upsertResponseMessage({
+              messages: currentMessages,
+              response: updatedResponse,
+              userMessage: userMessage as TMessage,
+              submission,
+            }),
+          );
         }
       } else if (event === 'on_message_delta') {
         const messageDelta = data as Agents.MessageDeltaEvent;
@@ -420,7 +429,14 @@ export default function useStepHandler({
           );
           messageMap.current.set(responseMessageId, updatedResponse);
           const currentMessages = getMessages() || [];
-          setMessages([...currentMessages.slice(0, -1), updatedResponse]);
+          setMessages(
+            upsertResponseMessage({
+              messages: currentMessages,
+              response: updatedResponse,
+              userMessage: userMessage as TMessage,
+              submission,
+            }),
+          );
         }
       } else if (event === 'on_reasoning_delta') {
         const reasoningDelta = data as Agents.ReasoningDeltaEvent;
@@ -461,7 +477,14 @@ export default function useStepHandler({
           );
           messageMap.current.set(responseMessageId, updatedResponse);
           const currentMessages = getMessages() || [];
-          setMessages([...currentMessages.slice(0, -1), updatedResponse]);
+          setMessages(
+            upsertResponseMessage({
+              messages: currentMessages,
+              response: updatedResponse,
+              userMessage: userMessage as TMessage,
+              submission,
+            }),
+          );
         }
       } else if (event === 'on_run_step_delta') {
         const runStepDelta = data as Agents.RunStepDeltaEvent;
@@ -514,11 +537,14 @@ export default function useStepHandler({
           });
 
           messageMap.current.set(responseMessageId, updatedResponse);
-          const updatedMessages = messages.map((msg) =>
-            msg.messageId === responseMessageId ? updatedResponse : msg,
+          setMessages(
+            upsertResponseMessage({
+              messages: getMessages() || messages,
+              response: updatedResponse,
+              userMessage: userMessage as TMessage,
+              submission,
+            }),
           );
-
-          setMessages(updatedMessages);
         }
       } else if (event === 'on_run_step_completed') {
         const { result } = data as unknown as { result: Agents.ToolEndEvent };
@@ -557,11 +583,14 @@ export default function useStepHandler({
           );
 
           messageMap.current.set(responseMessageId, updatedResponse);
-          const updatedMessages = messages.map((msg) =>
-            msg.messageId === responseMessageId ? updatedResponse : msg,
+          setMessages(
+            upsertResponseMessage({
+              messages: getMessages() || messages,
+              response: updatedResponse,
+              userMessage: userMessage as TMessage,
+              submission,
+            }),
           );
-
-          setMessages(updatedMessages);
         }
       }
 

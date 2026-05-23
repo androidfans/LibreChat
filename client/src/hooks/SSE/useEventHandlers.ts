@@ -42,6 +42,12 @@ import useContentHandler from '~/hooks/SSE/useContentHandler';
 import useStepHandler from '~/hooks/SSE/useStepHandler';
 import { useApplyAgentTemplate } from '~/hooks/Agents';
 import { useAuthContext } from '~/hooks/AuthContext';
+import {
+  filterOptimisticSubmissionMessages,
+  upsertCancelledMessages,
+  upsertPersistedRequestMessage,
+  upsertResponseMessage,
+} from './utils';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 import { useLiveAnnouncer } from '~/Providers';
 import store from '~/store';
@@ -289,7 +295,7 @@ export default function useEventHandlers({
 
   const messageHandler = useCallback(
     (data: string | undefined, submission: EventSubmission) => {
-      const { messages, userMessage, initialResponse, isRegenerate = false } = submission;
+      const { messages, userMessage, initialResponse } = submission;
       const text = data ?? '';
       setIsSubmitting(true);
 
@@ -299,26 +305,20 @@ export default function useEventHandlers({
         lastAnnouncementTimeRef.current = currentTime;
       }
 
-      if (isRegenerate) {
-        setMessages([
-          ...messages,
-          {
-            ...initialResponse,
-            text,
-          },
-        ]);
-      } else {
-        setMessages([
-          ...messages,
-          userMessage,
-          {
-            ...initialResponse,
-            text,
-          },
-        ]);
-      }
+      const response = {
+        ...initialResponse,
+        text,
+      };
+      setMessages(
+        upsertResponseMessage({
+          messages: getMessages() ?? messages,
+          response,
+          userMessage: userMessage as TMessage,
+          submission: { ...submission, userMessage },
+        }),
+      );
     },
-    [setMessages, announcePolite, setIsSubmitting],
+    [getMessages, setMessages, announcePolite, setIsSubmitting],
   );
 
   const cancelHandler = useCallback(
@@ -327,19 +327,17 @@ export default function useEventHandlers({
       const { messages, isRegenerate = false } = submission;
       const convoUpdate =
         (conversation as TConversation | null) ?? (submission.conversation as TConversation);
+      const currentMessages = getMessages() ?? messages;
 
-      // update the messages
-      if (isRegenerate) {
-        const messagesUpdate = (
-          [...messages, responseMessage] as Array<TMessage | undefined>
-        ).filter((msg) => msg);
-        setMessages(messagesUpdate as TMessage[]);
-      } else {
-        const messagesUpdate = (
-          [...messages, requestMessage, responseMessage] as Array<TMessage | undefined>
-        ).filter((msg) => msg);
-        setMessages(messagesUpdate as TMessage[]);
-      }
+      setMessages(
+        upsertCancelledMessages({
+          messages: currentMessages,
+          requestMessage,
+          responseMessage,
+          submission,
+          isRegenerate,
+        }),
+      );
 
       const isNewConvo = conversation.conversationId !== submission.conversation.conversationId;
       if (isNewConvo) {
@@ -355,14 +353,19 @@ export default function useEventHandlers({
 
       setIsSubmitting(false);
     },
-    [setMessages, setConversation, isAddedRequest, queryClient, setIsSubmitting],
+    [getMessages, setMessages, setConversation, isAddedRequest, queryClient, setIsSubmitting],
   );
 
   const syncHandler = useCallback(
     (data: TSyncData, submission: EventSubmission) => {
       const { conversationId, thread_id, responseMessage, requestMessage } = data;
       const { initialResponse, messages: _messages, userMessage } = submission;
-      const messages = _messages.filter((msg) => msg.messageId !== userMessage.messageId);
+      const messages = filterOptimisticSubmissionMessages({
+        messages: getMessages() ?? _messages,
+        submission,
+        responseMessageId: responseMessage.messageId,
+        userMessageId: userMessage.messageId,
+      });
 
       setMessages([
         ...messages,
@@ -423,6 +426,7 @@ export default function useEventHandlers({
     },
     [
       queryClient,
+      getMessages,
       setMessages,
       isAddedRequest,
       announcePolite,
@@ -442,9 +446,23 @@ export default function useEventHandlers({
         messageId: userMessage.messageId + '_',
       };
       if (isRegenerate) {
-        setMessages([...messages, initialResponse]);
+        setMessages(
+          upsertResponseMessage({
+            messages: getMessages() ?? messages,
+            response: initialResponse,
+            userMessage: userMessage as TMessage,
+            submission,
+          }),
+        );
       } else {
-        setMessages([...messages, userMessage, initialResponse]);
+        setMessages(
+          upsertResponseMessage({
+            messages: getMessages() ?? messages,
+            response: initialResponse,
+            userMessage: userMessage as TMessage,
+            submission,
+          }),
+        );
       }
 
       const { conversationId, parentMessageId } = userMessage;
@@ -507,6 +525,7 @@ export default function useEventHandlers({
     },
     [
       setMessages,
+      getMessages,
       queryClient,
       setAbortScroll,
       isAddedRequest,
@@ -520,12 +539,7 @@ export default function useEventHandlers({
   const finalHandler = useCallback(
     (data: TFinalResData, submission: EventSubmission) => {
       const { requestMessage, responseMessage, conversation, runMessages } = data;
-      const {
-        messages,
-        conversation: submissionConvo,
-        isRegenerate = false,
-        isTemporary: _isTemporary = false,
-      } = submission;
+      const { conversation: submissionConvo } = submission;
 
       try {
         // Handle early abort - aborted during tool loading before any messages saved
@@ -572,6 +586,7 @@ export default function useEventHandlers({
           clearSubmittedDraftRecovery(submission, requestMessage);
           return;
         }
+        const baseMessages = currentMessages;
 
         /* a11y announcements */
         announcePolite({ message: 'end', isStatus: true });
@@ -596,7 +611,10 @@ export default function useEventHandlers({
         /** Handle edge case where stream is cancelled before any response, which creates a blank page */
         if (!conversation.conversationId && hasNoResponse) {
           const currentConvoId =
-            (submissionConvo.conversationId ?? conversation.conversationId) || Constants.NEW_CONVO;
+            requestMessage?.conversationId ??
+            submissionConvo.conversationId ??
+            conversation.conversationId ??
+            Constants.NEW_CONVO;
           if (isNewConvo && submissionConvo.conversationId) {
             removeConvoFromAllQueries(queryClient, submissionConvo.conversationId);
           }
@@ -605,13 +623,77 @@ export default function useEventHandlers({
             location.pathname === `/c/${Constants.NEW_CONVO}` &&
             currentConvoId === Constants.NEW_CONVO;
 
-          setFinalMessages(currentConvoId, isNewChat ? [] : [...messages]);
-          restoreSubmittedDraftRecovery({
-            submission,
+          const hasPersistedRequest = Boolean(
+            requestMessage?.messageId && requestMessage.conversationId,
+          );
+          const noResponseMessages = upsertPersistedRequestMessage({
+            messages: submission.messages,
             requestMessage,
-            draftId: currentConvoId,
-            saveDrafts,
           });
+          setFinalMessages(currentConvoId, isNewChat ? [] : noResponseMessages);
+          if (hasPersistedRequest) {
+            const persistedConvoId = requestMessage?.conversationId ?? currentConvoId;
+            let update = {} as TConversation;
+            if (
+              persistedConvoId &&
+              persistedConvoId !== Constants.NEW_CONVO &&
+              setConversation &&
+              isAddedRequest !== true
+            ) {
+              setConversation((prevState) => {
+                const parentId = requestMessage?.parentMessageId;
+                const title = getConvoTitle({
+                  parentId,
+                  queryClient,
+                  conversationId: persistedConvoId,
+                  currentTitle: prevState?.title,
+                });
+                update = tConvoUpdateSchema.parse({
+                  ...prevState,
+                  ...conversation,
+                  conversationId: persistedConvoId,
+                  title,
+                  messages: requestMessage?.messageId ? [requestMessage.messageId] : undefined,
+                  endpoint:
+                    conversation.endpoint ??
+                    submissionConvo.endpoint ??
+                    prevState?.endpoint ??
+                    null,
+                  endpointType:
+                    conversation.endpointType ??
+                    submissionConvo.endpointType ??
+                    prevState?.endpointType,
+                }) as TConversation;
+
+                const cachedConvo = queryClient.getQueryData<TConversation>([
+                  QueryKeys.conversation,
+                  persistedConvoId,
+                ]);
+                if (!cachedConvo) {
+                  queryClient.setQueryData([QueryKeys.conversation, persistedConvoId], update);
+                }
+                return update;
+              });
+
+              if (requestMessage?.parentMessageId === Constants.NO_PARENT) {
+                addConvoToAllQueries(queryClient, update);
+              } else {
+                updateConvoInAllQueries(queryClient, persistedConvoId, (_c) => update, true);
+              }
+
+              if (location.pathname === `/c/${Constants.NEW_CONVO}`) {
+                navigate(`/c/${persistedConvoId}`, { replace: true });
+              }
+            }
+            clearSubmittedDraftRecovery(submission, requestMessage);
+          } else {
+            restoreSubmittedDraftRecovery({
+              submission,
+              requestMessage,
+              draftId: currentConvoId,
+              saveDrafts,
+            });
+          }
           if (isNewChat) {
             navigate(`/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
           }
@@ -622,10 +704,20 @@ export default function useEventHandlers({
         let finalMessages: TMessage[] = [];
         if (runMessages) {
           finalMessages = [...runMessages];
-        } else if (isRegenerate && responseMessage) {
-          finalMessages = [...messages, responseMessage];
         } else if (requestMessage != null && responseMessage != null) {
-          finalMessages = [...messages, requestMessage, responseMessage];
+          finalMessages = upsertResponseMessage({
+            messages: baseMessages,
+            response: responseMessage,
+            userMessage: requestMessage,
+            submission: { ...submission, userMessage: requestMessage },
+          });
+        } else if (responseMessage) {
+          finalMessages = upsertResponseMessage({
+            messages: baseMessages,
+            response: responseMessage,
+            userMessage: submission.userMessage as TMessage,
+            submission,
+          });
         }
         if (finalMessages.length > 0) {
           setFinalMessages(conversation.conversationId, finalMessages);
@@ -713,7 +805,12 @@ export default function useEventHandlers({
         userMessage.conversationId ?? submission.conversation?.conversationId ?? '';
 
       const setErrorMessages = (convoId: string, errorMessage: TMessage) => {
-        const finalMessages: TMessage[] = [...messages, userMessage, errorMessage];
+        const finalMessages = upsertResponseMessage({
+          messages: getMessages() ?? messages,
+          response: errorMessage,
+          userMessage: userMessage as TMessage,
+          submission,
+        });
         setMessages(finalMessages);
         queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], finalMessages);
       };
@@ -917,7 +1014,14 @@ export default function useEventHandlers({
           submission,
           error,
         });
-        setMessages([...submission.messages, submission.userMessage, errorResponse]);
+        setMessages(
+          upsertResponseMessage({
+            messages: getMessages() ?? submission.messages,
+            response: errorResponse,
+            userMessage: submission.userMessage as TMessage,
+            submission,
+          }),
+        );
         if (newConversation) {
           newConversation({
             template: { conversationId: conversationId || errorResponse.conversationId || v4() },

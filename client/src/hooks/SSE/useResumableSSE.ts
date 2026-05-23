@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
-import { useSetRecoilState } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   request,
@@ -17,6 +17,7 @@ import { useGetStartupConfig, useGetUserBalance, queueTitleGeneration } from '~/
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
+import { getResponseAliasIds } from './utils';
 import store from '~/store';
 
 const clearDraft = (conversationId?: string | null) => {
@@ -59,6 +60,8 @@ export default function useResumableSSE(
 ) {
   const queryClient = useQueryClient();
   const setActiveRunId = useSetRecoilState(store.activeRunFamily(runIndex));
+  const setActiveStreamId = useSetRecoilState(store.activeStreamIdFamily(runIndex));
+  const stopGenerationRequest = useRecoilValue(store.stopGenerationRequestFamily(runIndex));
 
   const { token, isAuthenticated } = useAuthContext();
 
@@ -87,6 +90,17 @@ export default function useResumableSSE(
     },
     [queryClient],
   );
+  const abortStartedStream = useCallback(
+    async (abortedStreamId: string) => {
+      try {
+        await request.post('/api/agents/chat/abort', { streamId: abortedStreamId });
+        removeActiveJob(abortedStreamId);
+      } catch (error) {
+        console.error('[ResumableSSE] Failed to abort stream after pending stop:', error);
+      }
+    },
+    [removeActiveJob],
+  );
   const [_completed, setCompleted] = useState(new Set());
   const [streamId, setStreamId] = useState<string | null>(null);
   const setAbortScroll = useSetRecoilState(store.abortScrollFamily(runIndex));
@@ -96,6 +110,7 @@ export default function useResumableSSE(
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const submissionRef = useRef<TSubmission | null>(null);
+  const stopGenerationRequestRef = useRef(stopGenerationRequest);
 
   const {
     setMessages,
@@ -128,6 +143,10 @@ export default function useResumableSSE(
     setShowStopButton,
     resetLatestMessage,
   });
+
+  useEffect(() => {
+    stopGenerationRequestRef.current = stopGenerationRequest;
+  }, [stopGenerationRequest]);
 
   const { data: startupConfig } = useGetStartupConfig();
   const balanceQuery = useGetUserBalance({
@@ -188,6 +207,7 @@ export default function useResumableSSE(
             (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
             sse.close();
             setStreamId(null);
+            setActiveStreamId(null);
             return;
           }
 
@@ -254,6 +274,13 @@ export default function useResumableSSE(
               if (responseIdx < 0) {
                 responseIdx = messages.findIndex(
                   (m) =>
+                    m.messageId === currentSubmission.initialResponse?.messageId ||
+                    m.messageId === `${userMsgId}_`,
+                );
+              }
+              if (responseIdx < 0) {
+                responseIdx = messages.findIndex(
+                  (m) =>
                     !m.isCreatedByUser &&
                     (m.messageId === `${userMsgId}_` || m.parentMessageId === userMsgId),
                 );
@@ -270,14 +297,28 @@ export default function useResumableSSE(
 
               if (responseIdx >= 0) {
                 // Update existing response message with aggregatedContent
-                const updated = [...messages];
-                const oldContent = updated[responseIdx]?.content;
-                updated[responseIdx] = {
-                  ...updated[responseIdx],
+                const existingResponse = messages[responseIdx];
+                const oldContent = existingResponse?.content;
+                const responseId =
+                  serverResponseId ?? existingResponse?.messageId ?? `${userMsgId}_`;
+                const updatedResponse = {
+                  ...existingResponse,
+                  messageId: responseId,
+                  parentMessageId: userMsgId,
+                  conversationId: currentSubmission.conversation?.conversationId ?? '',
                   content: data.resumeState.aggregatedContent,
-                };
+                } as TMessage;
+                const aliasIds = getResponseAliasIds({
+                  submission: currentSubmission,
+                  userMessageId: userMsgId,
+                  responseMessageId: responseId,
+                });
+                const updated = messages.filter(
+                  (message, index) => index !== responseIdx && !aliasIds.has(message.messageId),
+                );
+                updated.push(updatedResponse);
                 console.log('[ResumableSSE] SYNC updating message', {
-                  messageId: updated[responseIdx]?.messageId,
+                  messageId: updatedResponse.messageId,
                   oldContentLength: Array.isArray(oldContent) ? oldContent.length : 0,
                   newContentLength: data.resumeState.aggregatedContent?.length,
                 });
@@ -285,13 +326,18 @@ export default function useResumableSSE(
                 // Sync both content handler and step handler with the updated message
                 // so subsequent deltas build on synced content, not stale content
                 resetContentHandler();
-                syncStepMessage(updated[responseIdx]);
+                syncStepMessage(updatedResponse);
                 console.log('[ResumableSSE] SYNC complete, handlers synced');
               } else {
                 // Add new response message
                 const responseId = serverResponseId ?? `${userMsgId}_`;
+                const aliasIds = getResponseAliasIds({
+                  submission: currentSubmission,
+                  userMessageId: userMsgId,
+                  responseMessageId: responseId,
+                });
                 setMessages([
-                  ...messages,
+                  ...messages.filter((message) => !aliasIds.has(message.messageId)),
                   {
                     messageId: responseId,
                     parentMessageId: userMsgId,
@@ -314,7 +360,10 @@ export default function useResumableSSE(
             if (text != null && index !== textIndex) {
               textIndex = index;
             }
-            contentHandler({ data, submission: currentSubmission as EventSubmission });
+            contentHandler({
+              data,
+              submission: { ...currentSubmission, userMessage } as EventSubmission,
+            });
             return;
           }
 
@@ -351,6 +400,7 @@ export default function useResumableSSE(
           setIsSubmitting(false);
           setShowStopButton(false);
           setStreamId(null);
+          setActiveStreamId(null);
           reconnectAttemptRef.current = 0;
           return;
         }
@@ -408,6 +458,7 @@ export default function useResumableSSE(
           setIsSubmitting(false);
           setShowStopButton(false);
           setStreamId(null);
+          setActiveStreamId(null);
         }
       });
 
@@ -434,6 +485,7 @@ export default function useResumableSSE(
         setIsSubmitting(false);
         setShowStopButton(false);
         setStreamId(null);
+        setActiveStreamId(null);
       });
 
       // Start the SSE connection
@@ -466,6 +518,7 @@ export default function useResumableSSE(
       token,
       setAbortScroll,
       setActiveRunId,
+      setActiveStreamId,
       setShowStopButton,
       finalHandler,
       createdHandler,
@@ -534,11 +587,9 @@ export default function useResumableSSE(
 
       // All retries failed or non-network error
       console.error('[ResumableSSE] Error starting generation:', lastError);
-      errorHandler({ data: undefined, submission: currentSubmission as EventSubmission });
-      setIsSubmitting(false);
-      return null;
+      throw lastError instanceof Error ? lastError : new Error('Failed to start generation');
     },
-    [clearStepMaps, errorHandler, setIsSubmitting],
+    [clearStepMaps],
   );
 
   useEffect(() => {
@@ -555,6 +606,7 @@ export default function useResumableSSE(
         sseRef.current = null;
       }
       setStreamId(null);
+      setActiveStreamId(null);
       reconnectAttemptRef.current = 0;
       submissionRef.current = null;
       return;
@@ -570,23 +622,50 @@ export default function useResumableSSE(
 
     submissionRef.current = submission;
 
+    let cancelled = false;
+    const initialStopGenerationRequest = stopGenerationRequestRef.current;
+    const wasExplicitlyStopped = () =>
+      stopGenerationRequestRef.current !== initialStopGenerationRequest;
+
     const initStream = async () => {
       setIsSubmitting(true);
       setShowStopButton(true);
 
       if (resumeStreamId) {
+        if (cancelled) {
+          return;
+        }
         // Resume: just subscribe to existing stream, don't start new generation
         console.log('[ResumableSSE] Resuming existing stream:', resumeStreamId);
         setStreamId(resumeStreamId);
+        setActiveStreamId(resumeStreamId);
         // Optimistically add to active jobs (in case it's not already there)
         addActiveJob(resumeStreamId);
         subscribeToStream(resumeStreamId, submission, true); // isResume=true
       } else {
         // New generation: start and then subscribe
         console.log('[ResumableSSE] Starting NEW generation');
-        const newStreamId = await startGeneration(submission);
+        let newStreamId: string | null = null;
+        try {
+          newStreamId = await startGeneration(submission);
+        } catch {
+          if (cancelled || submissionRef.current !== submission) {
+            return;
+          }
+          errorHandler({ data: undefined, submission: submission as EventSubmission });
+          setIsSubmitting(false);
+          setShowStopButton(false);
+          return;
+        }
+        if (cancelled || submissionRef.current !== submission) {
+          if (newStreamId && wasExplicitlyStopped()) {
+            await abortStartedStream(newStreamId);
+          }
+          return;
+        }
         if (newStreamId) {
           setStreamId(newStreamId);
+          setActiveStreamId(newStreamId);
           // Optimistically add to active jobs
           addActiveJob(newStreamId);
           // Queue title generation if this is a new conversation (first message)
@@ -597,6 +676,8 @@ export default function useResumableSSE(
           subscribeToStream(newStreamId, submission);
         } else {
           console.error('[ResumableSSE] Failed to get streamId from startGeneration');
+          setIsSubmitting(false);
+          setShowStopButton(false);
         }
       }
     };
@@ -604,6 +685,7 @@ export default function useResumableSSE(
     initStream();
 
     return () => {
+      cancelled = true;
       console.log('[ResumableSSE] Cleanup - closing SSE, resetting UI state');
       // Cleanup on unmount/navigation - close connection but DO NOT abort backend
       // Reset UI state so it doesn't leak to other conversations
@@ -623,6 +705,7 @@ export default function useResumableSSE(
       // Reset UI state on cleanup - useResumeOnLoad will restore if needed
       setIsSubmitting(false);
       setShowStopButton(false);
+      setActiveStreamId(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submission]);
