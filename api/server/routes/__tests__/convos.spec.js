@@ -38,6 +38,10 @@ jest.mock('~/models/Conversation', () => ({
   saveConvo: jest.fn(),
 }));
 
+jest.mock('~/models/Message', () => ({
+  getMessages: jest.fn(),
+}));
+
 jest.mock('~/models/ToolCall', () => ({
   deleteToolCalls: jest.fn(),
 }));
@@ -109,7 +113,8 @@ describe('Convos Routes', () => {
   let app;
   let convosRouter;
   const { deleteAllSharedLinks, deleteConvoSharedLink } = require('~/models');
-  const { deleteConvos } = require('~/models/Conversation');
+  const { deleteConvos, getConvo } = require('~/models/Conversation');
+  const { getMessages } = require('~/models/Message');
   const { deleteToolCalls } = require('~/models/ToolCall');
 
   beforeAll(() => {
@@ -129,6 +134,8 @@ describe('Convos Routes', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    getConvo.mockResolvedValue(null);
+    getMessages.mockResolvedValue([]);
   });
 
   describe('DELETE /all', () => {
@@ -459,6 +466,56 @@ describe('Convos Routes', () => {
 
       /** Verify it was called after the conversation was deleted */
       expect(deleteConvoSharedLink).toHaveBeenCalledAfter(deleteConvos);
+    });
+
+    it('should resolve provider thread metadata from the database when deleting a cached-miss assistant conversation', async () => {
+      const mockConversationId = 'assistant-conv-cache-miss';
+      const openaiDelete = jest.fn().mockResolvedValue({ deleted: true });
+      const assistantsEndpoint = require('~/server/services/Endpoints/assistants');
+
+      getConvo.mockResolvedValue({
+        conversationId: mockConversationId,
+        endpointType: 'assistants',
+      });
+      getMessages.mockResolvedValue([
+        { messageId: 'user-1' },
+        { messageId: 'assistant-1', thread_id: 'thread-from-db' },
+      ]);
+      assistantsEndpoint.initializeClient.mockResolvedValue({
+        openai: {
+          beta: {
+            threads: {
+              delete: openaiDelete,
+            },
+          },
+        },
+      });
+      deleteConvos.mockResolvedValue({ deletedCount: 1 });
+      deleteToolCalls.mockResolvedValue({ deletedCount: 0 });
+      deleteConvoSharedLink.mockResolvedValue({ deletedCount: 0 });
+
+      const response = await request(app)
+        .delete('/api/convos')
+        .send({
+          arg: {
+            conversationId: mockConversationId,
+            source: 'button',
+          },
+        });
+
+      expect(response.status).toBe(201);
+      expect(getConvo).toHaveBeenCalledWith('test-user-123', mockConversationId);
+      expect(getMessages).toHaveBeenCalledWith(
+        {
+          conversationId: mockConversationId,
+          user: 'test-user-123',
+        },
+        'thread_id endpoint',
+      );
+      expect(openaiDelete).toHaveBeenCalledWith('thread-from-db');
+      expect(deleteConvos).toHaveBeenCalledWith('test-user-123', {
+        conversationId: mockConversationId,
+      });
     });
   });
 });
