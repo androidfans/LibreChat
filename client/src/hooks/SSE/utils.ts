@@ -140,8 +140,15 @@ export const filterOptimisticSubmissionMessages = ({
     responseMessageId,
     userMessageId,
   });
+  const userAliasIds = new Set(
+    [
+      userMessageId,
+      submission.userMessage?.messageId,
+      submission.initialResponse?.parentMessageId,
+    ].filter((id): id is string => Boolean(id)),
+  );
 
   return messages.filter(
-    (message) => message.messageId !== userMessageId && !responseAliasIds.has(message.messageId),
+    (message) => !userAliasIds.has(message.messageId) && !responseAliasIds.has(message.messageId),
   );
 };

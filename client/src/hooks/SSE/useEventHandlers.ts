@@ -451,7 +451,7 @@ export default function useEventHandlers({
             messages: getMessages() ?? messages,
             response: initialResponse,
             userMessage: userMessage as TMessage,
-            submission: { ...submission, userMessage, initialResponse },
+            submission,
           }),
         );
       } else {
@@ -460,7 +460,7 @@ export default function useEventHandlers({
             messages: getMessages() ?? messages,
             response: initialResponse,
             userMessage: userMessage as TMessage,
-            submission: { ...submission, userMessage, initialResponse },
+            submission,
           }),
         );
       }

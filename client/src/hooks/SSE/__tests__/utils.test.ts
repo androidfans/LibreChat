@@ -104,6 +104,42 @@ describe('upsertResponseMessage', () => {
       'persisted-response',
     ]);
   });
+
+  it('removes optimistic root aliases when created has already persisted the user message', () => {
+    const persistedUser = message({ messageId: 'persisted-user', text: 'hello' });
+    const createdResponse = message({
+      messageId: 'persisted-user_',
+      parentMessageId: 'persisted-user',
+      isCreatedByUser: false,
+      text: '',
+    });
+
+    const result = upsertResponseMessage({
+      messages: [
+        message({
+          messageId: 'optimistic-user',
+          parentMessageId: '00000000-0000-0000-0000-000000000000',
+          text: 'hello',
+        }),
+        message({
+          messageId: 'optimistic-user_',
+          parentMessageId: 'optimistic-user',
+          isCreatedByUser: false,
+        }),
+      ],
+      response: createdResponse,
+      userMessage: persistedUser,
+      submission: {
+        userMessage: { messageId: 'persisted-user' },
+        initialResponse: {
+          messageId: 'optimistic-user_',
+          parentMessageId: 'optimistic-user',
+        },
+      },
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual(['persisted-user', 'persisted-user_']);
+  });
 });
 
 describe('filterOptimisticSubmissionMessages', () => {
@@ -124,6 +160,26 @@ describe('filterOptimisticSubmissionMessages', () => {
     });
 
     expect(result.map((msg) => msg.messageId)).toEqual(['root']);
+  });
+
+  it('removes the optimistic user alias when sync receives the persisted request id', () => {
+    const result = filterOptimisticSubmissionMessages({
+      messages: [
+        message({ messageId: 'optimistic-user', isCreatedByUser: true }),
+        message({ messageId: 'optimistic-response', isCreatedByUser: false }),
+      ],
+      submission: {
+        userMessage: { messageId: 'persisted-user' },
+        initialResponse: {
+          messageId: 'optimistic-response',
+          parentMessageId: 'optimistic-user',
+        },
+      },
+      responseMessageId: 'persisted-response',
+      userMessageId: 'persisted-user',
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual([]);
   });
 });
 
