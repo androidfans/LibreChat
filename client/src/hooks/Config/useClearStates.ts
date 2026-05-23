@@ -38,6 +38,7 @@ export default function useClearStates() {
           reset(store.globalAudioPlayingFamily(key));
           reset(store.activeRunFamily(key));
           reset(store.activeStreamIdFamily(key));
+          reset(store.stopGenerationRequestFamily(key));
           reset(store.audioRunFamily(key));
           reset(store.messagesSiblingIdxFamily(key.toString()));
         }

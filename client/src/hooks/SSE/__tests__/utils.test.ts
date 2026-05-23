@@ -1,5 +1,5 @@
 import type { TMessage } from 'librechat-data-provider';
-import { upsertResponseMessage } from '../utils';
+import { filterOptimisticSubmissionMessages, upsertResponseMessage } from '../utils';
 
 const message = (overrides: Partial<TMessage>): TMessage =>
   ({
@@ -61,5 +61,26 @@ describe('upsertResponseMessage', () => {
 
     expect(result.map((msg) => msg.messageId)).toEqual(['root', 'user-real', 'response-real']);
     expect(result.some((msg) => msg.messageId === 'deleted-sibling')).toBe(false);
+  });
+});
+
+describe('filterOptimisticSubmissionMessages', () => {
+  it('removes optimistic user and assistant placeholders before sync appends persisted messages', () => {
+    const result = filterOptimisticSubmissionMessages({
+      messages: [
+        message({ messageId: 'root' }),
+        message({ messageId: 'optimistic-user', isCreatedByUser: true }),
+        message({ messageId: 'optimistic-response', isCreatedByUser: false }),
+        message({ messageId: 'optimistic-user_', isCreatedByUser: false }),
+      ],
+      submission: {
+        userMessage: { messageId: 'optimistic-user', responseMessageId: 'optimistic-user_' },
+        initialResponse: { messageId: 'optimistic-response' },
+      },
+      responseMessageId: 'persisted-response',
+      userMessageId: 'optimistic-user',
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual(['root']);
   });
 });

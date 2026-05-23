@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
-import { useSetRecoilState } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   request,
@@ -61,6 +61,7 @@ export default function useResumableSSE(
   const queryClient = useQueryClient();
   const setActiveRunId = useSetRecoilState(store.activeRunFamily(runIndex));
   const setActiveStreamId = useSetRecoilState(store.activeStreamIdFamily(runIndex));
+  const stopGenerationRequest = useRecoilValue(store.stopGenerationRequestFamily(runIndex));
 
   const { token, isAuthenticated } = useAuthContext();
 
@@ -89,6 +90,17 @@ export default function useResumableSSE(
     },
     [queryClient],
   );
+  const abortStartedStream = useCallback(
+    async (abortedStreamId: string) => {
+      try {
+        await request.post('/api/agents/chat/abort', { streamId: abortedStreamId });
+        removeActiveJob(abortedStreamId);
+      } catch (error) {
+        console.error('[ResumableSSE] Failed to abort stream after pending stop:', error);
+      }
+    },
+    [removeActiveJob],
+  );
   const [_completed, setCompleted] = useState(new Set());
   const [streamId, setStreamId] = useState<string | null>(null);
   const setAbortScroll = useSetRecoilState(store.abortScrollFamily(runIndex));
@@ -98,6 +110,7 @@ export default function useResumableSSE(
   const reconnectAttemptRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const submissionRef = useRef<TSubmission | null>(null);
+  const stopGenerationRequestRef = useRef(stopGenerationRequest);
 
   const {
     setMessages,
@@ -130,6 +143,10 @@ export default function useResumableSSE(
     setShowStopButton,
     resetLatestMessage,
   });
+
+  useEffect(() => {
+    stopGenerationRequestRef.current = stopGenerationRequest;
+  }, [stopGenerationRequest]);
 
   const { data: startupConfig } = useGetStartupConfig();
   const balanceQuery = useGetUserBalance({
@@ -606,6 +623,9 @@ export default function useResumableSSE(
     submissionRef.current = submission;
 
     let cancelled = false;
+    const initialStopGenerationRequest = stopGenerationRequestRef.current;
+    const wasExplicitlyStopped = () =>
+      stopGenerationRequestRef.current !== initialStopGenerationRequest;
 
     const initStream = async () => {
       setIsSubmitting(true);
@@ -638,6 +658,9 @@ export default function useResumableSSE(
           return;
         }
         if (cancelled || submissionRef.current !== submission) {
+          if (newStreamId && wasExplicitlyStopped()) {
+            await abortStartedStream(newStreamId);
+          }
           return;
         }
         if (newStreamId) {

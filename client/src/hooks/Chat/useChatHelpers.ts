@@ -26,6 +26,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const { isAuthenticated } = useAuthContext();
   const abortMutation = useAbortStreamMutation();
   const activeStreamId = useRecoilValue(store.activeStreamIdFamily(index));
+  const setStopGenerationRequest = useSetRecoilState(store.stopGenerationRequestFamily(index));
 
   const { newConversation } = useNewConvo(index);
   const { useCreateConversationAtom } = store;
@@ -102,6 +103,12 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   // );
 
   const setSubmission = useSetRecoilState(store.submissionByIndex(index));
+  const getCurrentActiveStreamId = useRecoilCallback(
+    ({ snapshot }) =>
+      async () =>
+        snapshot.getPromise(store.activeStreamIdFamily(index)),
+    [index],
+  );
   const clearSubmissionIfCurrent = useRecoilCallback(
     ({ snapshot, set }) =>
       async ({
@@ -111,7 +118,10 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         conversationId?: string;
         streamId?: string | null;
       }) => {
-        const currentSubmission = await snapshot.getPromise(store.submissionByIndex(index));
+        const [currentSubmission, currentActiveStreamId] = await Promise.all([
+          snapshot.getPromise(store.submissionByIndex(index)),
+          snapshot.getPromise(store.activeStreamIdFamily(index)),
+        ]);
         if (!currentSubmission) {
           return;
         }
@@ -120,15 +130,22 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         const currentUserMessageConversationId = currentSubmission.userMessage?.conversationId;
         const currentStreamId = (currentSubmission as TSubmission & { resumeStreamId?: string })
           .resumeStreamId;
+        const matchesPendingNew =
+          expectedConversationId === Constants.NEW_CONVO &&
+          currentConversationId == null &&
+          currentUserMessageConversationId == null &&
+          currentActiveStreamId == null;
         const matchesConversation =
           expectedConversationId != null &&
           (currentConversationId === expectedConversationId ||
             currentUserMessageConversationId === expectedConversationId);
         const matchesStream =
           expectedStreamId != null &&
-          (currentStreamId === expectedStreamId || currentConversationId === expectedStreamId);
+          (currentStreamId === expectedStreamId ||
+            currentConversationId === expectedStreamId ||
+            currentActiveStreamId === expectedStreamId);
 
-        if (matchesConversation || matchesStream) {
+        if (matchesPendingNew || matchesConversation || matchesStream) {
           set(store.submissionByIndex(index), null);
           return;
         }
@@ -138,6 +155,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           expectedStreamId,
           currentConversationId,
           currentStreamId,
+          currentActiveStreamId,
         });
       },
     [index],
@@ -194,37 +212,40 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       actualEndpoint,
       isAssistants,
     });
+    setStopGenerationRequest((requestId) => requestId + 1);
+    const streamIdToAbort = activeStreamId ?? (await getCurrentActiveStreamId());
 
     // For non-assistants endpoints (using resumable streams), call abort endpoint first
     const abortConversationId =
       conversationId && conversationId !== Constants.NEW_CONVO ? conversationId : undefined;
+    const stopConversationId = abortConversationId ?? conversationId ?? Constants.NEW_CONVO;
 
-    if (!isAssistants && (activeStreamId || abortConversationId)) {
+    if (!isAssistants && (streamIdToAbort || abortConversationId)) {
       queryClient.setQueryData<ActiveJobsResponse>([QueryKeys.activeJobs], (old) => ({
         activeJobIds: (old?.activeJobIds ?? []).filter(
-          (id) => id !== activeStreamId && id !== abortConversationId,
+          (id) => id !== streamIdToAbort && id !== abortConversationId,
         ),
       }));
 
       try {
         logger.debug('conversation', '[useChatHelpers] Calling abort mutation for:', {
-          streamId: activeStreamId,
+          streamId: streamIdToAbort,
           conversationId: abortConversationId,
         });
         await abortMutation.mutateAsync({
-          streamId: activeStreamId ?? undefined,
+          streamId: streamIdToAbort ?? undefined,
           conversationId: abortConversationId,
         });
         logger.debug('conversation', '[useChatHelpers] Abort mutation succeeded');
         await clearSubmissionIfCurrent({
-          conversationId: abortConversationId ?? conversationId,
-          streamId: activeStreamId,
+          conversationId: stopConversationId,
+          streamId: streamIdToAbort,
         });
       } catch (error) {
         logger.error('conversation', '[useChatHelpers] Abort failed:', error);
         await clearSubmissionIfCurrent({
-          conversationId: abortConversationId ?? conversationId,
-          streamId: activeStreamId,
+          conversationId: stopConversationId,
+          streamId: streamIdToAbort,
         });
       }
     } else {
@@ -234,7 +255,10 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           ? '[useChatHelpers] Assistants endpoint, clearing current submission'
           : '[useChatHelpers] No concrete stream id available, clearing current submission',
       );
-      await clearSubmissionIfCurrent({ conversationId, streamId: activeStreamId });
+      await clearSubmissionIfCurrent({
+        conversationId: stopConversationId,
+        streamId: streamIdToAbort,
+      });
     }
   }, [
     activeStreamId,
@@ -243,7 +267,9 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     endpointType,
     abortMutation,
     clearSubmissionIfCurrent,
+    getCurrentActiveStreamId,
     queryClient,
+    setStopGenerationRequest,
   ]);
 
   const handleStopGenerating = (e: React.MouseEvent<HTMLButtonElement>) => {

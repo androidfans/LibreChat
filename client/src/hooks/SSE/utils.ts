@@ -47,3 +47,25 @@ export const upsertResponseMessage = ({
 
   return [...updatedMessages, response];
 };
+
+export const filterOptimisticSubmissionMessages = ({
+  messages,
+  submission,
+  responseMessageId,
+  userMessageId = submission.userMessage?.messageId,
+}: {
+  messages: TMessage[];
+  submission: ResponseAliasSubmission;
+  responseMessageId?: string;
+  userMessageId?: string;
+}) => {
+  const responseAliasIds = getResponseAliasIds({
+    submission,
+    responseMessageId,
+    userMessageId,
+  });
+
+  return messages.filter(
+    (message) => message.messageId !== userMessageId && !responseAliasIds.has(message.messageId),
+  );
+};

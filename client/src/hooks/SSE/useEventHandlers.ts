@@ -42,7 +42,7 @@ import useContentHandler from '~/hooks/SSE/useContentHandler';
 import useStepHandler from '~/hooks/SSE/useStepHandler';
 import { useApplyAgentTemplate } from '~/hooks/Agents';
 import { useAuthContext } from '~/hooks/AuthContext';
-import { upsertResponseMessage } from './utils';
+import { filterOptimisticSubmissionMessages, upsertResponseMessage } from './utils';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 import { useLiveAnnouncer } from '~/Providers';
 import store from '~/store';
@@ -358,9 +358,12 @@ export default function useEventHandlers({
     (data: TSyncData, submission: EventSubmission) => {
       const { conversationId, thread_id, responseMessage, requestMessage } = data;
       const { initialResponse, messages: _messages, userMessage } = submission;
-      const messages = (getMessages() ?? _messages).filter(
-        (msg) => msg.messageId !== userMessage.messageId,
-      );
+      const messages = filterOptimisticSubmissionMessages({
+        messages: getMessages() ?? _messages,
+        submission,
+        responseMessageId: responseMessage.messageId,
+        userMessageId: userMessage.messageId,
+      });
 
       setMessages([
         ...messages,
