@@ -1,8 +1,14 @@
 import { useCallback, useState } from 'react';
 import { Constants, QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRecoilState, useRecoilValue, useResetRecoilState, useSetRecoilState } from 'recoil';
-import type { TMessage } from 'librechat-data-provider';
+import {
+  useRecoilCallback,
+  useRecoilState,
+  useRecoilValue,
+  useResetRecoilState,
+  useSetRecoilState,
+} from 'recoil';
+import type { TMessage, TSubmission } from 'librechat-data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useGetMessagesByConvoId, useAbortStreamMutation } from '~/data-provider';
 import useChatFunctions from '~/hooks/Chat/useChatFunctions';
@@ -93,6 +99,46 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   // );
 
   const setSubmission = useSetRecoilState(store.submissionByIndex(index));
+  const clearSubmissionIfCurrent = useRecoilCallback(
+    ({ snapshot, set }) =>
+      async ({
+        conversationId: expectedConversationId,
+        streamId: expectedStreamId,
+      }: {
+        conversationId?: string;
+        streamId?: string | null;
+      }) => {
+        const currentSubmission = await snapshot.getPromise(store.submissionByIndex(index));
+        if (!currentSubmission) {
+          return;
+        }
+
+        const currentConversationId = currentSubmission.conversation?.conversationId;
+        const currentUserMessageConversationId = currentSubmission.userMessage?.conversationId;
+        const currentStreamId = (currentSubmission as TSubmission & { resumeStreamId?: string })
+          .resumeStreamId;
+        const matchesConversation =
+          expectedConversationId != null &&
+          (currentConversationId === expectedConversationId ||
+            currentUserMessageConversationId === expectedConversationId);
+        const matchesStream =
+          expectedStreamId != null &&
+          (currentStreamId === expectedStreamId || currentConversationId === expectedStreamId);
+
+        if (matchesConversation || matchesStream) {
+          set(store.submissionByIndex(index), null);
+          return;
+        }
+
+        console.log('[useChatHelpers] Skipping stale stop cleanup', {
+          expectedConversationId,
+          expectedStreamId,
+          currentConversationId,
+          currentStreamId,
+        });
+      },
+    [index],
+  );
 
   const { ask, regenerate } = useChatFunctions({
     index,
@@ -167,11 +213,16 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           conversationId: abortConversationId,
         });
         console.log('[useChatHelpers] Abort mutation succeeded');
-        setSubmission(null);
+        await clearSubmissionIfCurrent({
+          conversationId: abortConversationId ?? conversationId,
+          streamId: activeStreamId,
+        });
       } catch (error) {
         console.error('[useChatHelpers] Abort failed:', error);
-        // Fall back to clearing submissions
-        setSubmission(null);
+        await clearSubmissionIfCurrent({
+          conversationId: abortConversationId ?? conversationId,
+          streamId: activeStreamId,
+        });
       }
     } else {
       console.log(
@@ -179,7 +230,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           ? '[useChatHelpers] Assistants endpoint, clearing current submission'
           : '[useChatHelpers] No concrete stream id available, clearing current submission',
       );
-      setSubmission(null);
+      await clearSubmissionIfCurrent({ conversationId, streamId: activeStreamId });
     }
   }, [
     activeStreamId,
@@ -187,7 +238,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     endpoint,
     endpointType,
     abortMutation,
-    setSubmission,
+    clearSubmissionIfCurrent,
     queryClient,
   ]);
 
