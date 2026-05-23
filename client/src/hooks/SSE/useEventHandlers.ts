@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { v4 } from 'uuid';
-import { useSetRecoilState } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -26,6 +26,7 @@ import type { ConversationCursorData } from '~/utils';
 import {
   logger,
   setDraft,
+  setFileDraft,
   getSubmittedDraft,
   scrollToEnd,
   removeSubmittedDraft,
@@ -173,9 +174,11 @@ const getSubmittedDraftIds = (
 ): string[] =>
   Array.from(
     new Set(
-      [submission.userMessage?.messageId, requestMessage?.messageId].filter((id): id is string =>
-        Boolean(id),
-      ),
+      [
+        submission.userMessage?.messageId,
+        requestMessage?.messageId,
+        submission.initialResponse?.parentMessageId,
+      ].filter((id): id is string => Boolean(id)),
     ),
   );
 
@@ -186,26 +189,67 @@ const clearSubmittedDraftRecovery = (
   getSubmittedDraftIds(submission, requestMessage).forEach(removeSubmittedDraft);
 };
 
+const getMessageFileIds = (message?: TMessage | null) =>
+  (message?.files ?? [])
+    .map((file) => file.file_id ?? file.temp_file_id)
+    .filter((fileId): fileId is string => typeof fileId === 'string' && fileId.length > 0);
+
+const getTargetDraftId = ({
+  recoveryConversationId,
+  draftId,
+}: {
+  recoveryConversationId?: string | null;
+  draftId?: string | Constants | null;
+}) => {
+  const currentDraftId = draftId != null ? String(draftId) : '';
+
+  if (
+    currentDraftId &&
+    currentDraftId !== Constants.NEW_CONVO &&
+    currentDraftId !== Constants.PENDING_CONVO
+  ) {
+    return currentDraftId;
+  }
+
+  return recoveryConversationId || currentDraftId || Constants.NEW_CONVO;
+};
+
 const restoreSubmittedDraftRecovery = ({
   submission,
   requestMessage,
   draftId,
   fallbackText,
+  saveDrafts,
 }: {
   submission: EventSubmission;
   requestMessage?: TMessage | null;
   draftId?: string | Constants | null;
   fallbackText?: string | null;
+  saveDrafts: boolean;
 }) => {
   const ids = getSubmittedDraftIds(submission, requestMessage);
+
+  if (!saveDrafts) {
+    ids.forEach(removeSubmittedDraft);
+    return;
+  }
+
   const recovery = ids.map((id) => getSubmittedDraft(id)).find(Boolean);
   const text =
     recovery?.text || fallbackText || requestMessage?.text || submission.userMessage?.text;
-  const targetDraftId = recovery?.conversationId || draftId || Constants.NEW_CONVO;
+  const fileIds =
+    recovery?.fileIds && recovery.fileIds.length > 0
+      ? recovery.fileIds
+      : [...getMessageFileIds(requestMessage), ...getMessageFileIds(submission.userMessage)];
+  const targetDraftId = getTargetDraftId({
+    recoveryConversationId: recovery?.conversationId,
+    draftId,
+  });
 
   if (text) {
     setDraft({ id: String(targetDraftId), value: text });
   }
+  setFileDraft({ id: String(targetDraftId), fileIds });
 
   ids.forEach(removeSubmittedDraft);
 };
@@ -231,6 +275,7 @@ export default function useEventHandlers({
   const lastAnnouncementTimeRef = useRef(Date.now());
   const { conversationId: paramId } = useParams();
   const { token } = useAuthContext();
+  const saveDrafts = useRecoilValue<boolean>(store.saveDrafts);
 
   const { contentHandler, resetContentHandler } = useContentHandler({ setMessages, getMessages });
   const { stepHandler, clearStepMaps, syncStepMessage } = useStepHandler({
@@ -493,6 +538,7 @@ export default function useEventHandlers({
             submission,
             requestMessage,
             draftId: submissionConvo.conversationId || Constants.NEW_CONVO,
+            saveDrafts,
           });
           setShowStopButton(false);
           setIsSubmitting(false);
@@ -564,6 +610,7 @@ export default function useEventHandlers({
             submission,
             requestMessage,
             draftId: currentConvoId,
+            saveDrafts,
           });
           if (isNewChat) {
             navigate(`/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
@@ -651,6 +698,7 @@ export default function useEventHandlers({
       setIsSubmitting,
       setShowStopButton,
       location.pathname,
+      saveDrafts,
       applyAgentTemplate,
       attachmentHandler,
     ],
@@ -708,6 +756,7 @@ export default function useEventHandlers({
         restoreSubmittedDraftRecovery({
           submission,
           draftId: conversationId || Constants.NEW_CONVO,
+          saveDrafts,
         });
         setIsSubmitting(false);
         return;
@@ -727,6 +776,7 @@ export default function useEventHandlers({
         restoreSubmittedDraftRecovery({
           submission,
           draftId: Constants.NEW_CONVO,
+          saveDrafts,
         });
         setIsSubmitting(false);
         return;
@@ -762,6 +812,7 @@ export default function useEventHandlers({
       paramId,
       newConversation,
       setIsSubmitting,
+      saveDrafts,
       getMessages,
       queryClient,
     ],

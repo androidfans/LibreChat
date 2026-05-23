@@ -5,6 +5,7 @@ export const SUBMITTED_DRAFT_PREFIX = 'submittedDraft_';
 type SubmittedDraft = {
   text: string;
   conversationId?: string | null;
+  fileIds?: string[];
   createdAt: number;
 };
 
@@ -14,6 +15,23 @@ export const removeDraft = (id?: string | null) => {
 
 export const removeFileDraft = (id?: string | null) => {
   localStorage.removeItem(`${LocalStorageKeys.FILES_DRAFT}${id ?? ''}`);
+};
+
+export const setFileDraft = ({ id, fileIds }: { id: string; fileIds?: string[] }) => {
+  const normalizedFileIds = Array.from(
+    new Set(
+      (fileIds ?? []).filter(
+        (fileId): fileId is string => typeof fileId === 'string' && fileId.length > 0,
+      ),
+    ),
+  );
+
+  if (normalizedFileIds.length === 0) {
+    removeFileDraft(id);
+    return;
+  }
+
+  localStorage.setItem(`${LocalStorageKeys.FILES_DRAFT}${id}`, JSON.stringify(normalizedFileIds));
 };
 
 export const removeDrafts = (id?: string | null) => {
@@ -67,18 +85,29 @@ export const setSubmittedDraft = ({
   id,
   text,
   conversationId,
+  fileIds,
 }: {
   id?: string | null;
   text?: string | null;
   conversationId?: string | null;
+  fileIds?: string[];
 }) => {
   if (!id || !text) {
     return;
   }
 
+  const normalizedFileIds = Array.from(
+    new Set(
+      (fileIds ?? []).filter(
+        (fileId): fileId is string => typeof fileId === 'string' && fileId.length > 0,
+      ),
+    ),
+  );
+
   const submittedDraft: SubmittedDraft = {
     text: encodeBase64(text),
     conversationId,
+    fileIds: normalizedFileIds,
     createdAt: Date.now(),
   };
 
@@ -100,6 +129,11 @@ export const getSubmittedDraft = (id?: string | null): SubmittedDraft | null => 
     return {
       ...submittedDraft,
       text: decodeBase64(submittedDraft.text),
+      fileIds: Array.isArray(submittedDraft.fileIds)
+        ? submittedDraft.fileIds.filter(
+            (fileId): fileId is string => typeof fileId === 'string' && fileId.length > 0,
+          )
+        : [],
     };
   } catch {
     removeSubmittedDraft(id);

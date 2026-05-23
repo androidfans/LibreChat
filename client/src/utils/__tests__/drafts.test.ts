@@ -3,6 +3,7 @@ import { TextDecoder, TextEncoder } from 'util';
 import {
   getDraft,
   setDraft,
+  setFileDraft,
   removeDraft,
   removeDrafts,
   removeFileDraft,
@@ -54,6 +55,7 @@ describe('drafts', () => {
       id: 'message-1',
       text: 'submitted text',
       conversationId: 'new',
+      fileIds: ['file-1', 'file-1', 'file-2'],
     });
 
     expect(getDraft('new')).toBeNull();
@@ -61,6 +63,7 @@ describe('drafts', () => {
       expect.objectContaining({
         text: 'submitted text',
         conversationId: 'new',
+        fileIds: ['file-1', 'file-2'],
       }),
     );
     expect(localStorage.getItem(`${SUBMITTED_DRAFT_PREFIX}message-1`)).toBeTruthy();
@@ -94,6 +97,18 @@ describe('drafts', () => {
     removeFileDraft('convo-1');
 
     expect(getDraft('convo-1')).toBe('draft text');
+    expect(localStorage.getItem(`${LocalStorageKeys.FILES_DRAFT}convo-1`)).toBeNull();
+  });
+
+  it('stores file drafts with normalized file ids', () => {
+    setFileDraft({ id: 'convo-1', fileIds: ['file-1', '', 'file-1', 'file-2'] });
+
+    expect(localStorage.getItem(`${LocalStorageKeys.FILES_DRAFT}convo-1`)).toBe(
+      JSON.stringify(['file-1', 'file-2']),
+    );
+
+    setFileDraft({ id: 'convo-1', fileIds: [] });
+
     expect(localStorage.getItem(`${LocalStorageKeys.FILES_DRAFT}convo-1`)).toBeNull();
   });
 

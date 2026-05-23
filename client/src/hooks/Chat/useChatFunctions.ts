@@ -37,6 +37,11 @@ const logChatRequest = (request: Record<string, unknown>) => {
   logger.log('=====================================');
 };
 
+const getMessageFileIds = (messageFiles?: TMessage['files']) =>
+  (messageFiles ?? [])
+    .map((file) => file.file_id ?? file.temp_file_id)
+    .filter((fileId): fileId is string => typeof fileId === 'string' && fileId.length > 0);
+
 export default function useChatFunctions({
   index = 0,
   files,
@@ -68,6 +73,7 @@ export default function useChatFunctions({
   const setFilesToDelete = useSetFilesToDelete();
   const getEphemeralAgent = useGetEphemeralAgent();
   const isTemporary = useRecoilValue(store.isTemporary);
+  const saveDrafts = useRecoilValue<boolean>(store.saveDrafts);
   const { getExpiry } = useUserKey(immutableConversation?.endpoint ?? '');
   const setIsSubmitting = useSetRecoilState(store.isSubmittingFamily(index));
   const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(index));
@@ -121,6 +127,8 @@ export default function useChatFunctions({
     const ephemeralAgent = getEphemeralAgent(conversationId ?? Constants.NEW_CONVO);
     const isEditOrContinue = isEdited || isContinued;
     const draftConversationId = conversationId || Constants.NEW_CONVO;
+    const draftFileIds =
+      files && files.size > 0 ? Array.from(files.keys()) : getMessageFileIds(overrideFiles);
 
     let currentMessages: TMessage[] | null = overrideMessages ?? getMessages() ?? [];
 
@@ -212,11 +220,14 @@ export default function useChatFunctions({
     };
 
     if (!isRegenerate && !isEditOrContinue) {
-      setSubmittedDraft({
-        id: currentMsg.messageId,
-        text: currentMsg.text,
-        conversationId: draftConversationId,
-      });
+      if (saveDrafts) {
+        setSubmittedDraft({
+          id: currentMsg.messageId,
+          text: currentMsg.text,
+          conversationId: draftConversationId,
+          fileIds: draftFileIds,
+        });
+      }
       removeDrafts(draftConversationId);
       removeDrafts(Constants.PENDING_CONVO);
     }
