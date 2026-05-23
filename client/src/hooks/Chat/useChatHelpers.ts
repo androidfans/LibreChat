@@ -58,6 +58,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
             message.conversationId !== Constants.NEW_CONVO &&
             message.conversationId !== Constants.PENDING_CONVO,
         )?.conversationId;
+      // Only write the route cache when it is a new-chat transition or the detected real
+      // conversation matches the route. A different real ID indicates a stale/cross-convo update.
       const shouldWriteQueryParam =
         !realConversationId ||
         queryParam === Constants.NEW_CONVO ||

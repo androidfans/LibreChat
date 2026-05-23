@@ -178,6 +178,8 @@ export const clearMessagesCache = (
   if (
     convoId === Constants.NEW_CONVO ||
     convoId === Constants.PENDING_CONVO ||
+    // useNewConvo marks cancelled transient conversations with an underscore prefix.
+    // Real server conversation IDs are UUIDs, so do not clear real conversation caches here.
     convoId.startsWith('_')
   ) {
     queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], []);
