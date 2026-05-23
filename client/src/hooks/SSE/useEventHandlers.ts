@@ -632,6 +632,59 @@ export default function useEventHandlers({
           });
           setFinalMessages(currentConvoId, isNewChat ? [] : noResponseMessages);
           if (hasPersistedRequest) {
+            const persistedConvoId = requestMessage?.conversationId ?? currentConvoId;
+            let update = {} as TConversation;
+            if (
+              persistedConvoId &&
+              persistedConvoId !== Constants.NEW_CONVO &&
+              setConversation &&
+              isAddedRequest !== true
+            ) {
+              setConversation((prevState) => {
+                const parentId = requestMessage?.parentMessageId;
+                const title = getConvoTitle({
+                  parentId,
+                  queryClient,
+                  conversationId: persistedConvoId,
+                  currentTitle: prevState?.title,
+                });
+                update = tConvoUpdateSchema.parse({
+                  ...prevState,
+                  ...conversation,
+                  conversationId: persistedConvoId,
+                  title,
+                  messages: requestMessage?.messageId ? [requestMessage.messageId] : undefined,
+                  endpoint:
+                    conversation.endpoint ??
+                    submissionConvo.endpoint ??
+                    prevState?.endpoint ??
+                    null,
+                  endpointType:
+                    conversation.endpointType ??
+                    submissionConvo.endpointType ??
+                    prevState?.endpointType,
+                }) as TConversation;
+
+                const cachedConvo = queryClient.getQueryData<TConversation>([
+                  QueryKeys.conversation,
+                  persistedConvoId,
+                ]);
+                if (!cachedConvo) {
+                  queryClient.setQueryData([QueryKeys.conversation, persistedConvoId], update);
+                }
+                return update;
+              });
+
+              if (requestMessage?.parentMessageId === Constants.NO_PARENT) {
+                addConvoToAllQueries(queryClient, update);
+              } else {
+                updateConvoInAllQueries(queryClient, persistedConvoId, (_c) => update, true);
+              }
+
+              if (location.pathname === `/c/${Constants.NEW_CONVO}`) {
+                navigate(`/c/${persistedConvoId}`, { replace: true });
+              }
+            }
             clearSubmittedDraftRecovery(submission, requestMessage);
           } else {
             restoreSubmittedDraftRecovery({
