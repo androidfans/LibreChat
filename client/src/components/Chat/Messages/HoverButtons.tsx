@@ -1,5 +1,6 @@
 import React, { useState, useMemo, memo } from 'react';
 import { useRecoilState } from 'recoil';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
 import {
   EditIcon,
@@ -15,6 +16,7 @@ import {
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
 import { Fork } from '~/components/Conversations';
 import { useDeleteMessageSubtree } from '~/data-provider/Messages/mutations';
+import { useChatContext } from '~/Providers';
 import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
@@ -135,10 +137,14 @@ const HoverButtons = ({
   handleFeedback,
 }: THoverButtons) => {
   const localize = useLocalize();
+  const navigate = useNavigate();
+  const { conversationId: currentConvoId } = useParams();
   const [isCopied, setIsCopied] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [TextToSpeech] = useRecoilState<boolean>(store.textToSpeech);
-  const deleteMessageSubtree = useDeleteMessageSubtree(conversation?.conversationId ?? '');
+  const { newConversation } = useChatContext();
+  const targetConversationId = conversation?.conversationId ?? '';
+  const deleteMessageSubtree = useDeleteMessageSubtree(targetConversationId);
 
   const endpoint = useMemo(() => {
     if (!conversation) {
@@ -198,7 +204,18 @@ const HoverButtons = ({
   const handleCopy = () => copyToClipboard(setIsCopied);
 
   const confirmDelete = () => {
-    deleteMessageSubtree.mutate(message.messageId);
+    deleteMessageSubtree.mutate(message.messageId, {
+      onSuccess: (data) => {
+        if (
+          targetConversationId &&
+          currentConvoId === targetConversationId &&
+          (data.conversationDeleted === true || data.remainingCount === 0)
+        ) {
+          newConversation();
+          navigate('/c/new', { replace: true });
+        }
+      },
+    });
     setDeleteDialogOpen(false);
   };
 

@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 const { v4: uuidv4 } = require('uuid');
-const { messageSchema } = require('@librechat/data-schemas');
+const { convoSchema, messageSchema } = require('@librechat/data-schemas');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
 const {
@@ -11,6 +11,7 @@ const {
   bulkSaveMessages,
   updateMessageText,
   deleteMessagesSince,
+  deleteMessageSubtree,
 } = require('./Message');
 
 jest.mock('~/server/services/Config/app');
@@ -19,6 +20,7 @@ jest.mock('~/server/services/Config/app');
  * @type {import('mongoose').Model<import('@librechat/data-schemas').IMessage>}
  */
 let Message;
+let Conversation;
 
 describe('Message Operations', () => {
   let mongoServer;
@@ -29,6 +31,7 @@ describe('Message Operations', () => {
     mongoServer = await MongoMemoryServer.create();
     const mongoUri = mongoServer.getUri();
     Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
+    Conversation = mongoose.models.Conversation || mongoose.model('Conversation', convoSchema);
     await mongoose.connect(mongoUri);
   });
 
@@ -40,6 +43,7 @@ describe('Message Operations', () => {
   beforeEach(async () => {
     // Clear database
     await Message.deleteMany({});
+    await Conversation.deleteMany({});
 
     mockReq = {
       user: { id: 'user123' },
@@ -217,6 +221,105 @@ describe('Message Operations', () => {
 
       expect(user123Messages).toHaveLength(0);
       expect(user456Messages).toHaveLength(1);
+    });
+  });
+
+  describe('deleteMessageSubtree', () => {
+    it('should update conversation message references after deleting a subtree', async () => {
+      const conversationId = uuidv4();
+
+      await saveMessage(mockReq, {
+        messageId: 'root',
+        conversationId,
+        parentMessageId: '00000000-0000-0000-0000-000000000000',
+        text: 'Root',
+        user: 'user123',
+      });
+      await saveMessage(mockReq, {
+        messageId: 'child-a',
+        conversationId,
+        parentMessageId: 'root',
+        text: 'Child A',
+        user: 'user123',
+      });
+      await saveMessage(mockReq, {
+        messageId: 'grandchild-a',
+        conversationId,
+        parentMessageId: 'child-a',
+        text: 'Grandchild A',
+        user: 'user123',
+      });
+      const sibling = await saveMessage(mockReq, {
+        messageId: 'child-b',
+        conversationId,
+        parentMessageId: 'root',
+        text: 'Child B',
+        user: 'user123',
+      });
+
+      await Conversation.create({
+        conversationId,
+        user: 'user123',
+        title: 'Test conversation',
+        messages: (
+          await Message.find({ conversationId, user: 'user123' }).select('_id').lean()
+        ).map((message) => message._id),
+      });
+
+      const result = await deleteMessageSubtree('child-a', conversationId, 'user123');
+
+      expect(result.deletedCount).toBe(2);
+      expect(result.remainingCount).toBe(2);
+      expect(result.conversationDeleted).toBe(false);
+
+      const remainingMessages = await Message.find({ conversationId, user: 'user123' }).sort({
+        createdAt: 1,
+      });
+      expect(remainingMessages.map((message) => message.messageId)).toEqual(['root', 'child-b']);
+
+      const conversation = await Conversation.findOne({ conversationId, user: 'user123' }).lean();
+      expect(conversation.messages.map((id) => id.toString())).toEqual([
+        remainingMessages[0]._id.toString(),
+        sibling._id.toString(),
+      ]);
+    });
+
+    it('should empty conversation message references after deleting the whole message tree', async () => {
+      const conversationId = uuidv4();
+
+      await saveMessage(mockReq, {
+        messageId: 'root',
+        conversationId,
+        parentMessageId: '00000000-0000-0000-0000-000000000000',
+        text: 'Root',
+        user: 'user123',
+      });
+      await saveMessage(mockReq, {
+        messageId: 'child',
+        conversationId,
+        parentMessageId: 'root',
+        text: 'Child',
+        user: 'user123',
+      });
+
+      await Conversation.create({
+        conversationId,
+        user: 'user123',
+        title: 'Test conversation',
+        messages: (
+          await Message.find({ conversationId, user: 'user123' }).select('_id').lean()
+        ).map((message) => message._id),
+      });
+
+      const result = await deleteMessageSubtree('root', conversationId, 'user123');
+
+      expect(result.deletedCount).toBe(2);
+      expect(result.remainingCount).toBe(0);
+      expect(result.conversationDeleted).toBe(false);
+      expect(await Message.countDocuments({ conversationId, user: 'user123' })).toBe(0);
+
+      const conversation = await Conversation.findOne({ conversationId, user: 'user123' }).lean();
+      expect(conversation.messages).toEqual([]);
     });
   });
 

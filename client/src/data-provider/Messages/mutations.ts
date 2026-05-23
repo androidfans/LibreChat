@@ -1,7 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { dataService, QueryKeys, Constants } from 'librechat-data-provider';
-import type { UseMutationResult, UseMutationOptions } from '@tanstack/react-query';
+import type { InfiniteData, UseMutationResult, UseMutationOptions } from '@tanstack/react-query';
+import type { ConversationListResponse } from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
+import { removeConvoFromAllQueries } from '~/utils';
 
 type EditArtifactContext = {
   previousMessages: Record<string, t.TMessage[] | undefined>;
@@ -173,13 +175,23 @@ export const useBranchMessageMutation = (
   return useMutation(mutationOptions);
 };
 
+type DeleteMessageSubtreeResponse = {
+  deletedCount: number;
+  remainingCount?: number;
+  conversationDeleted?: boolean;
+};
+
 export const useDeleteMessageSubtree = (
   conversationId: string,
-): UseMutationResult<{ deletedCount: number }, Error, string> => {
+): UseMutationResult<DeleteMessageSubtreeResponse, Error, string> => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (messageId: string) => dataService.deleteMessageSubtree(conversationId, messageId),
-    onSuccess: (_data, messageId) => {
+    mutationFn: (messageId: string) =>
+      dataService.deleteMessageSubtree(
+        conversationId,
+        messageId,
+      ) as Promise<DeleteMessageSubtreeResponse>,
+    onSuccess: (data, messageId) => {
       queryClient.setQueryData<t.TMessage[]>([QueryKeys.messages, conversationId], (prev) => {
         if (!prev) {
           return prev;
@@ -200,8 +212,52 @@ export const useDeleteMessageSubtree = (
         return prev.filter((message) => !deletedIds.has(message.messageId));
       });
 
+      if (data.conversationDeleted === true || data.remainingCount === 0) {
+        queryClient.setQueryData<t.TMessage[]>([QueryKeys.messages, conversationId], []);
+        queryClient.removeQueries({
+          queryKey: [QueryKeys.conversation, conversationId],
+          exact: true,
+        });
+        removeConvoFromAllQueries(queryClient, conversationId);
+
+        const archivedQueries = queryClient
+          .getQueryCache()
+          .findAll([QueryKeys.archivedConversations], { exact: false });
+
+        for (const query of archivedQueries) {
+          queryClient.setQueryData<InfiniteData<ConversationListResponse>>(
+            query.queryKey,
+            (oldData) => {
+              if (!oldData) {
+                return oldData;
+              }
+              return {
+                ...oldData,
+                pages: oldData.pages
+                  .map((page) => ({
+                    ...page,
+                    conversations: page.conversations.filter(
+                      (convo) => convo.conversationId !== conversationId,
+                    ),
+                  }))
+                  .filter((page) => page.conversations.length > 0),
+              };
+            },
+          );
+        }
+
+        queryClient.invalidateQueries({
+          queryKey: [QueryKeys.allConversations],
+          refetchPage: (_, index) => index === 0,
+        });
+        queryClient.invalidateQueries({
+          queryKey: [QueryKeys.archivedConversations],
+          refetchPage: (_, index) => index === 0,
+        });
+        return;
+      }
+
       queryClient.invalidateQueries([QueryKeys.messages, conversationId]);
     },
   });
 };
-

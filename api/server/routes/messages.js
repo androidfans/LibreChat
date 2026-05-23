@@ -13,8 +13,9 @@ const {
   deleteMessageSubtree,
 } = require('~/models');
 const { findAllArtifacts, replaceArtifactContent } = require('~/server/services/Artifacts/update');
+const { deleteConversation } = require('~/server/services/Conversations/delete');
 const { requireJwtAuth, validateMessageReq } = require('~/server/middleware');
-const { getConvosQueried } = require('~/models/Conversation');
+const { getConvo, getConvosQueried } = require('~/models/Conversation');
 const { Message } = require('~/db/models');
 
 const router = express.Router();
@@ -413,8 +414,29 @@ router.delete('/:conversationId/:messageId/subtree', validateMessageReq, async (
   try {
     const { conversationId, messageId } = req.params;
     const userId = req.user.id;
+    const [conversation, messages] = await Promise.all([
+      getConvo(userId, conversationId),
+      getMessages({ conversationId, user: userId }),
+    ]);
+    const lastMessage = messages[messages.length - 1];
     const result = await deleteMessageSubtree(messageId, conversationId, userId);
-    res.status(200).json({ deletedCount: result.deletedCount });
+    const conversationDeleted = result.remainingCount === 0;
+
+    if (conversationDeleted) {
+      await deleteConversation({
+        req,
+        res,
+        conversationId,
+        thread_id: lastMessage?.thread_id,
+        endpoint: lastMessage?.endpoint ?? conversation?.endpointType ?? conversation?.endpoint,
+      });
+    }
+
+    res.status(200).json({
+      deletedCount: result.deletedCount,
+      remainingCount: result.remainingCount,
+      conversationDeleted,
+    });
   } catch (error) {
     logger.error('Error deleting message subtree:', error);
     res.status(500).json({ error: 'Internal server error' });

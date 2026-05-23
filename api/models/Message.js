@@ -1,7 +1,7 @@
 const { z } = require('zod');
 const { logger } = require('@librechat/data-schemas');
 const { createTempChatExpirationDate } = require('@librechat/api');
-const { Message } = require('~/db/models');
+const { Message, Conversation } = require('~/db/models');
 
 const idSchema = z.string().uuid();
 
@@ -376,7 +376,9 @@ async function getMessageSubtree(messageId, conversationId, userId) {
       parentMessageId: messageId,
       conversationId,
       user: userId,
-    }).select('messageId').lean();
+    })
+      .select('messageId')
+      .lean();
 
     let allNodes = [messageId];
 
@@ -406,11 +408,46 @@ async function getMessageSubtree(messageId, conversationId, userId) {
 async function deleteMessageSubtree(messageId, conversationId, userId) {
   try {
     const messageIds = await getMessageSubtree(messageId, conversationId, userId);
-    return await Message.deleteMany({
+    const result = await Message.deleteMany({
       messageId: { $in: messageIds },
       conversationId,
       user: userId,
     });
+
+    const remainingMessages = await Message.find({
+      conversationId,
+      user: userId,
+    })
+      .select('_id')
+      .sort({ createdAt: 1 })
+      .lean();
+
+    if (remainingMessages.length === 0) {
+      await Conversation.findOneAndUpdate(
+        { conversationId, user: userId },
+        {
+          $set: {
+            messages: [],
+            updatedAt: new Date(),
+          },
+        },
+        { new: true },
+      );
+      return { ...result, remainingCount: 0, conversationDeleted: false };
+    }
+
+    await Conversation.findOneAndUpdate(
+      { conversationId, user: userId },
+      {
+        $set: {
+          messages: remainingMessages.map((message) => message._id),
+          updatedAt: new Date(),
+        },
+      },
+      { new: true },
+    );
+
+    return { ...result, remainingCount: remainingMessages.length, conversationDeleted: false };
   } catch (err) {
     logger.error('Error deleting message subtree:', err);
     throw err;
