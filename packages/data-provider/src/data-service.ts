@@ -941,7 +941,7 @@ export function updateFeedback(
 export function deleteMessageSubtree(
   conversationId: string,
   messageId: string,
-): Promise<{ deletedCount: number }> {
+): Promise<m.TDeleteMessageSubtreeResponse> {
   return request.delete(`${endpoints.messages({ conversationId, messageId })}/subtree`);
 }
 

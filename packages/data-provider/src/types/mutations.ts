@@ -395,6 +395,12 @@ export type BranchMessageOptions = MutationOptions<
   Error
 >;
 
+export type TDeleteMessageSubtreeResponse = {
+  deletedCount: number;
+  remainingCount?: number;
+  conversationDeleted?: boolean;
+};
+
 export type TLogoutResponse = {
   message: string;
   redirect?: string;

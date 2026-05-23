@@ -3,7 +3,7 @@ const express = require('express');
 const { sleep } = require('@librechat/agents');
 const { isEnabled } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
-const { CacheKeys, EModelEndpoint } = require('librechat-data-provider');
+const { CacheKeys } = require('librechat-data-provider');
 const {
   createImportLimiters,
   validateConvoAccess,
@@ -13,16 +13,15 @@ const {
 const { getConvosByCursor, deleteConvos, getConvo, saveConvo } = require('~/models/Conversation');
 const { forkConversation, duplicateConversation } = require('~/server/utils/import/fork');
 const { storage, importFileFilter } = require('~/server/routes/files/multer');
-const { deleteAllSharedLinks, deleteConvoSharedLink } = require('~/models');
+const { deleteAllSharedLinks } = require('~/models');
+const {
+  deleteConversation,
+  deleteProviderThread,
+} = require('~/server/services/Conversations/delete');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
 const { importConversations } = require('~/server/utils/import');
 const { deleteToolCalls } = require('~/models/ToolCall');
 const getLogStores = require('~/cache/getLogStores');
-
-const assistantClients = {
-  [EModelEndpoint.azureAssistants]: require('~/server/services/Endpoints/azureAssistants'),
-  [EModelEndpoint.assistants]: require('~/server/services/Endpoints/assistants'),
-};
 
 const router = express.Router();
 router.use(requireJwtAuth);
@@ -113,26 +112,21 @@ router.delete('/', async (req, res) => {
     return res.status(200).send('No conversationId provided');
   }
 
-  if (
-    typeof endpoint !== 'undefined' &&
-    Object.prototype.propertyIsEnumerable.call(assistantClients, endpoint)
-  ) {
-    /** @type {{ openai: OpenAI }} */
-    const { openai } = await assistantClients[endpoint].initializeClient({ req, res });
-    try {
-      const response = await openai.beta.threads.delete(thread_id);
-      logger.debug('Deleted OpenAI thread:', response);
-    } catch (error) {
-      logger.error('Error deleting OpenAI thread:', error);
-    }
-  }
-
   try {
-    const dbResponse = await deleteConvos(req.user.id, filter);
+    let dbResponse;
     if (filter.conversationId) {
-      await deleteToolCalls(req.user.id, filter.conversationId);
-      await deleteConvoSharedLink(req.user.id, filter.conversationId);
+      dbResponse = await deleteConversation({
+        req,
+        res,
+        conversationId: filter.conversationId,
+        thread_id,
+        endpoint,
+      });
+    } else {
+      await deleteProviderThread({ req, res, endpoint, thread_id });
+      dbResponse = await deleteConvos(req.user.id, filter);
     }
+
     res.status(201).json(dbResponse);
   } catch (error) {
     logger.error('Error clearing conversations', error);
@@ -191,11 +185,9 @@ router.post('/update', validateConvoAccess, async (req, res) => {
   }
 
   try {
-    const dbResponse = await saveConvo(
-      req,
-      update,
-      { context: `POST /api/convos/update ${conversationId}` },
-    );
+    const dbResponse = await saveConvo(req, update, {
+      context: `POST /api/convos/update ${conversationId}`,
+    });
     res.status(201).json(dbResponse);
   } catch (error) {
     logger.error('Error updating conversation', error);
