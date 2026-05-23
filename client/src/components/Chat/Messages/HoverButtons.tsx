@@ -286,6 +286,7 @@ const HoverButtons = ({
             title={localize('com_ui_delete_message')}
             icon={<TrashIcon className="h-[19px] w-[19px]" />}
             isLast={isLast}
+            isDisabled={isSubmitting}
             className="text-text-secondary-alt hover:text-red-600"
           />
         </OGDialogTrigger>

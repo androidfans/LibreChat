@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Constants, QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRecoilState, useResetRecoilState, useSetRecoilState } from 'recoil';
+import { useRecoilState, useRecoilValue, useResetRecoilState, useSetRecoilState } from 'recoil';
 import type { TMessage } from 'librechat-data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useGetMessagesByConvoId, useAbortStreamMutation } from '~/data-provider';
@@ -12,13 +12,13 @@ import store from '~/store';
 
 // this to be set somewhere else
 export default function useChatHelpers(index = 0, paramId?: string) {
-  const clearAllSubmissions = store.useClearSubmissionState();
   const [files, setFiles] = useRecoilState(store.filesByIndex(index));
   const [filesLoading, setFilesLoading] = useState(false);
 
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthContext();
   const abortMutation = useAbortStreamMutation();
+  const activeStreamId = useRecoilValue(store.activeStreamIdFamily(index));
 
   const { newConversation } = useNewConvo(index);
   const { useCreateConversationAtom } = store;
@@ -139,6 +139,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     const isAssistants = isAssistantsEndpoint(actualEndpoint);
     console.log('[useChatHelpers] stopGenerating called', {
       conversationId,
+      activeStreamId,
       endpoint,
       endpointType,
       actualEndpoint,
@@ -146,29 +147,49 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     });
 
     // For non-assistants endpoints (using resumable streams), call abort endpoint first
-    if (conversationId && !isAssistants) {
+    const abortConversationId =
+      conversationId && conversationId !== Constants.NEW_CONVO ? conversationId : undefined;
+
+    if (!isAssistants && (activeStreamId || abortConversationId)) {
       queryClient.setQueryData<ActiveJobsResponse>([QueryKeys.activeJobs], (old) => ({
-        activeJobIds: (old?.activeJobIds ?? []).filter((id) => id !== conversationId),
+        activeJobIds: (old?.activeJobIds ?? []).filter(
+          (id) => id !== activeStreamId && id !== abortConversationId,
+        ),
       }));
 
       try {
-        console.log('[useChatHelpers] Calling abort mutation for:', conversationId);
-        await abortMutation.mutateAsync({ conversationId });
+        console.log('[useChatHelpers] Calling abort mutation for:', {
+          streamId: activeStreamId,
+          conversationId: abortConversationId,
+        });
+        await abortMutation.mutateAsync({
+          streamId: activeStreamId ?? undefined,
+          conversationId: abortConversationId,
+        });
         console.log('[useChatHelpers] Abort mutation succeeded');
-        // The SSE will receive a `done` event with `aborted: true` and clean up
-        // We still clear submissions as a fallback
-        clearAllSubmissions();
+        setSubmission(null);
       } catch (error) {
         console.error('[useChatHelpers] Abort failed:', error);
         // Fall back to clearing submissions
-        clearAllSubmissions();
+        setSubmission(null);
       }
     } else {
-      // For assistants endpoints, just clear submissions (existing behavior)
-      console.log('[useChatHelpers] Assistants endpoint, just clearing submissions');
-      clearAllSubmissions();
+      console.log(
+        isAssistants
+          ? '[useChatHelpers] Assistants endpoint, clearing current submission'
+          : '[useChatHelpers] No concrete stream id available, clearing current submission',
+      );
+      setSubmission(null);
     }
-  }, [conversationId, endpoint, endpointType, abortMutation, clearAllSubmissions, queryClient]);
+  }, [
+    activeStreamId,
+    conversationId,
+    endpoint,
+    endpointType,
+    abortMutation,
+    setSubmission,
+    queryClient,
+  ]);
 
   const handleStopGenerating = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();

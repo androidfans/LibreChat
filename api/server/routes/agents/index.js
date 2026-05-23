@@ -175,20 +175,26 @@ router.post('/chat/abort', async (req, res) => {
 
   // streamId === conversationId, so try any of the provided IDs
   // Skip "new" as it's a placeholder for new conversations, not an actual ID
+  const hasExplicitJobId = Boolean(
+    streamId || (conversationId && conversationId !== 'new') || abortKey,
+  );
   let jobStreamId =
     streamId || (conversationId !== 'new' ? conversationId : null) || abortKey?.split(':')[0];
   let job = jobStreamId ? await GenerationJobManager.getJob(jobStreamId) : null;
 
   // Fallback: if job not found and we have a userId, look up active jobs for user
   // This handles the case where frontend sends "new" but job was created with a UUID
-  if (!job && userId) {
+  if (!job && userId && !hasExplicitJobId) {
     logger.debug(`[AgentStream] Job not found by ID, checking active jobs for user: ${userId}`);
     const activeJobIds = await GenerationJobManager.getActiveJobIdsForUser(userId);
-    if (activeJobIds.length > 0) {
-      // Abort the most recent active job for this user
+    if (activeJobIds.length === 1) {
+      // Safe legacy fallback: there is only one possible active job for this user.
       jobStreamId = activeJobIds[0];
       job = await GenerationJobManager.getJob(jobStreamId);
       logger.debug(`[AgentStream] Found active job for user: ${jobStreamId}`);
+    } else if (activeJobIds.length > 1) {
+      logger.warn(`[AgentStream] Refusing ambiguous abort; active jobs: ${activeJobIds.length}`);
+      return res.status(409).json({ error: 'Multiple active jobs; streamId required' });
     }
   }
 

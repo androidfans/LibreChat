@@ -60,6 +60,7 @@ export default function useResumableSSE(
 ) {
   const queryClient = useQueryClient();
   const setActiveRunId = useSetRecoilState(store.activeRunFamily(runIndex));
+  const setActiveStreamId = useSetRecoilState(store.activeStreamIdFamily(runIndex));
 
   const { token, isAuthenticated } = useAuthContext();
 
@@ -189,6 +190,7 @@ export default function useResumableSSE(
             (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
             sse.close();
             setStreamId(null);
+            setActiveStreamId(null);
             return;
           }
 
@@ -381,6 +383,7 @@ export default function useResumableSSE(
           setIsSubmitting(false);
           setShowStopButton(false);
           setStreamId(null);
+          setActiveStreamId(null);
           reconnectAttemptRef.current = 0;
           return;
         }
@@ -438,6 +441,7 @@ export default function useResumableSSE(
           setIsSubmitting(false);
           setShowStopButton(false);
           setStreamId(null);
+          setActiveStreamId(null);
         }
       });
 
@@ -464,6 +468,7 @@ export default function useResumableSSE(
         setIsSubmitting(false);
         setShowStopButton(false);
         setStreamId(null);
+        setActiveStreamId(null);
       });
 
       // Start the SSE connection
@@ -496,6 +501,7 @@ export default function useResumableSSE(
       token,
       setAbortScroll,
       setActiveRunId,
+      setActiveStreamId,
       setShowStopButton,
       finalHandler,
       createdHandler,
@@ -564,11 +570,9 @@ export default function useResumableSSE(
 
       // All retries failed or non-network error
       console.error('[ResumableSSE] Error starting generation:', lastError);
-      errorHandler({ data: undefined, submission: currentSubmission as EventSubmission });
-      setIsSubmitting(false);
-      return null;
+      throw lastError instanceof Error ? lastError : new Error('Failed to start generation');
     },
-    [clearStepMaps, errorHandler, setIsSubmitting],
+    [clearStepMaps],
   );
 
   useEffect(() => {
@@ -585,6 +589,7 @@ export default function useResumableSSE(
         sseRef.current = null;
       }
       setStreamId(null);
+      setActiveStreamId(null);
       reconnectAttemptRef.current = 0;
       submissionRef.current = null;
       return;
@@ -600,23 +605,44 @@ export default function useResumableSSE(
 
     submissionRef.current = submission;
 
+    let cancelled = false;
+
     const initStream = async () => {
       setIsSubmitting(true);
       setShowStopButton(true);
 
       if (resumeStreamId) {
+        if (cancelled) {
+          return;
+        }
         // Resume: just subscribe to existing stream, don't start new generation
         console.log('[ResumableSSE] Resuming existing stream:', resumeStreamId);
         setStreamId(resumeStreamId);
+        setActiveStreamId(resumeStreamId);
         // Optimistically add to active jobs (in case it's not already there)
         addActiveJob(resumeStreamId);
         subscribeToStream(resumeStreamId, submission, true); // isResume=true
       } else {
         // New generation: start and then subscribe
         console.log('[ResumableSSE] Starting NEW generation');
-        const newStreamId = await startGeneration(submission);
+        let newStreamId: string | null = null;
+        try {
+          newStreamId = await startGeneration(submission);
+        } catch {
+          if (cancelled || submissionRef.current !== submission) {
+            return;
+          }
+          errorHandler({ data: undefined, submission: submission as EventSubmission });
+          setIsSubmitting(false);
+          setShowStopButton(false);
+          return;
+        }
+        if (cancelled || submissionRef.current !== submission) {
+          return;
+        }
         if (newStreamId) {
           setStreamId(newStreamId);
+          setActiveStreamId(newStreamId);
           // Optimistically add to active jobs
           addActiveJob(newStreamId);
           // Queue title generation if this is a new conversation (first message)
@@ -627,6 +653,8 @@ export default function useResumableSSE(
           subscribeToStream(newStreamId, submission);
         } else {
           console.error('[ResumableSSE] Failed to get streamId from startGeneration');
+          setIsSubmitting(false);
+          setShowStopButton(false);
         }
       }
     };
@@ -634,6 +662,7 @@ export default function useResumableSSE(
     initStream();
 
     return () => {
+      cancelled = true;
       console.log('[ResumableSSE] Cleanup - closing SSE, resetting UI state');
       // Cleanup on unmount/navigation - close connection but DO NOT abort backend
       // Reset UI state so it doesn't leak to other conversations
@@ -653,6 +682,7 @@ export default function useResumableSSE(
       // Reset UI state on cleanup - useResumeOnLoad will restore if needed
       setIsSubmitting(false);
       setShowStopButton(false);
+      setActiveStreamId(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [submission]);

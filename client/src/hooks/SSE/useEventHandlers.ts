@@ -42,6 +42,7 @@ import useContentHandler from '~/hooks/SSE/useContentHandler';
 import useStepHandler from '~/hooks/SSE/useStepHandler';
 import { useApplyAgentTemplate } from '~/hooks/Agents';
 import { useAuthContext } from '~/hooks/AuthContext';
+import { upsertResponseMessage } from './utils';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 import { useLiveAnnouncer } from '~/Providers';
 import store from '~/store';
@@ -289,7 +290,7 @@ export default function useEventHandlers({
 
   const messageHandler = useCallback(
     (data: string | undefined, submission: EventSubmission) => {
-      const { messages, userMessage, initialResponse, isRegenerate = false } = submission;
+      const { messages, userMessage, initialResponse } = submission;
       const text = data ?? '';
       setIsSubmitting(true);
 
@@ -299,26 +300,20 @@ export default function useEventHandlers({
         lastAnnouncementTimeRef.current = currentTime;
       }
 
-      if (isRegenerate) {
-        setMessages([
-          ...messages,
-          {
-            ...initialResponse,
-            text,
-          },
-        ]);
-      } else {
-        setMessages([
-          ...messages,
-          userMessage,
-          {
-            ...initialResponse,
-            text,
-          },
-        ]);
-      }
+      const response = {
+        ...initialResponse,
+        text,
+      };
+      setMessages(
+        upsertResponseMessage({
+          messages: getMessages() ?? messages,
+          response,
+          userMessage: userMessage as TMessage,
+          submission: { ...submission, userMessage },
+        }),
+      );
     },
-    [setMessages, announcePolite, setIsSubmitting],
+    [getMessages, setMessages, announcePolite, setIsSubmitting],
   );
 
   const cancelHandler = useCallback(
@@ -327,16 +322,17 @@ export default function useEventHandlers({
       const { messages, isRegenerate = false } = submission;
       const convoUpdate =
         (conversation as TConversation | null) ?? (submission.conversation as TConversation);
+      const currentMessages = getMessages() ?? messages;
 
       // update the messages
       if (isRegenerate) {
         const messagesUpdate = (
-          [...messages, responseMessage] as Array<TMessage | undefined>
+          [...currentMessages, responseMessage] as Array<TMessage | undefined>
         ).filter((msg) => msg);
         setMessages(messagesUpdate as TMessage[]);
       } else {
         const messagesUpdate = (
-          [...messages, requestMessage, responseMessage] as Array<TMessage | undefined>
+          [...currentMessages, requestMessage, responseMessage] as Array<TMessage | undefined>
         ).filter((msg) => msg);
         setMessages(messagesUpdate as TMessage[]);
       }
@@ -355,14 +351,16 @@ export default function useEventHandlers({
 
       setIsSubmitting(false);
     },
-    [setMessages, setConversation, isAddedRequest, queryClient, setIsSubmitting],
+    [getMessages, setMessages, setConversation, isAddedRequest, queryClient, setIsSubmitting],
   );
 
   const syncHandler = useCallback(
     (data: TSyncData, submission: EventSubmission) => {
       const { conversationId, thread_id, responseMessage, requestMessage } = data;
       const { initialResponse, messages: _messages, userMessage } = submission;
-      const messages = _messages.filter((msg) => msg.messageId !== userMessage.messageId);
+      const messages = (getMessages() ?? _messages).filter(
+        (msg) => msg.messageId !== userMessage.messageId,
+      );
 
       setMessages([
         ...messages,
@@ -423,6 +421,7 @@ export default function useEventHandlers({
     },
     [
       queryClient,
+      getMessages,
       setMessages,
       isAddedRequest,
       announcePolite,
@@ -442,9 +441,23 @@ export default function useEventHandlers({
         messageId: userMessage.messageId + '_',
       };
       if (isRegenerate) {
-        setMessages([...messages, initialResponse]);
+        setMessages(
+          upsertResponseMessage({
+            messages: getMessages() ?? messages,
+            response: initialResponse,
+            userMessage: userMessage as TMessage,
+            submission: { ...submission, userMessage, initialResponse },
+          }),
+        );
       } else {
-        setMessages([...messages, userMessage, initialResponse]);
+        setMessages(
+          upsertResponseMessage({
+            messages: getMessages() ?? messages,
+            response: initialResponse,
+            userMessage: userMessage as TMessage,
+            submission: { ...submission, userMessage, initialResponse },
+          }),
+        );
       }
 
       const { conversationId, parentMessageId } = userMessage;
@@ -507,6 +520,7 @@ export default function useEventHandlers({
     },
     [
       setMessages,
+      getMessages,
       queryClient,
       setAbortScroll,
       isAddedRequest,
@@ -520,12 +534,7 @@ export default function useEventHandlers({
   const finalHandler = useCallback(
     (data: TFinalResData, submission: EventSubmission) => {
       const { requestMessage, responseMessage, conversation, runMessages } = data;
-      const {
-        messages,
-        conversation: submissionConvo,
-        isRegenerate = false,
-        isTemporary: _isTemporary = false,
-      } = submission;
+      const { conversation: submissionConvo } = submission;
 
       try {
         // Handle early abort - aborted during tool loading before any messages saved
@@ -572,6 +581,7 @@ export default function useEventHandlers({
           clearSubmittedDraftRecovery(submission, requestMessage);
           return;
         }
+        const baseMessages = currentMessages;
 
         /* a11y announcements */
         announcePolite({ message: 'end', isStatus: true });
@@ -605,7 +615,7 @@ export default function useEventHandlers({
             location.pathname === `/c/${Constants.NEW_CONVO}` &&
             currentConvoId === Constants.NEW_CONVO;
 
-          setFinalMessages(currentConvoId, isNewChat ? [] : [...messages]);
+          setFinalMessages(currentConvoId, isNewChat ? [] : [...baseMessages]);
           restoreSubmittedDraftRecovery({
             submission,
             requestMessage,
@@ -622,10 +632,20 @@ export default function useEventHandlers({
         let finalMessages: TMessage[] = [];
         if (runMessages) {
           finalMessages = [...runMessages];
-        } else if (isRegenerate && responseMessage) {
-          finalMessages = [...messages, responseMessage];
         } else if (requestMessage != null && responseMessage != null) {
-          finalMessages = [...messages, requestMessage, responseMessage];
+          finalMessages = upsertResponseMessage({
+            messages: baseMessages,
+            response: responseMessage,
+            userMessage: requestMessage,
+            submission: { ...submission, userMessage: requestMessage },
+          });
+        } else if (responseMessage) {
+          finalMessages = upsertResponseMessage({
+            messages: baseMessages,
+            response: responseMessage,
+            userMessage: submission.userMessage as TMessage,
+            submission,
+          });
         }
         if (finalMessages.length > 0) {
           setFinalMessages(conversation.conversationId, finalMessages);
@@ -713,7 +733,12 @@ export default function useEventHandlers({
         userMessage.conversationId ?? submission.conversation?.conversationId ?? '';
 
       const setErrorMessages = (convoId: string, errorMessage: TMessage) => {
-        const finalMessages: TMessage[] = [...messages, userMessage, errorMessage];
+        const finalMessages = upsertResponseMessage({
+          messages: getMessages() ?? messages,
+          response: errorMessage,
+          userMessage: userMessage as TMessage,
+          submission,
+        });
         setMessages(finalMessages);
         queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], finalMessages);
       };
@@ -917,7 +942,14 @@ export default function useEventHandlers({
           submission,
           error,
         });
-        setMessages([...submission.messages, submission.userMessage, errorResponse]);
+        setMessages(
+          upsertResponseMessage({
+            messages: getMessages() ?? submission.messages,
+            response: errorResponse,
+            userMessage: submission.userMessage as TMessage,
+            submission,
+          }),
+        );
         if (newConversation) {
           newConversation({
             template: { conversationId: conversationId || errorResponse.conversationId || v4() },

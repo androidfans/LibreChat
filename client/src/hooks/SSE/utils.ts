@@ -34,7 +34,11 @@ export const upsertResponseMessage = ({
   userMessage: TMessage;
   submission: ResponseAliasSubmission;
 }) => {
-  const aliasIds = getResponseAliasIds({ submission, responseMessageId: response.messageId });
+  const aliasIds = getResponseAliasIds({
+    submission,
+    responseMessageId: response.messageId,
+    userMessageId: userMessage.messageId,
+  });
   let updatedMessages = messages.filter((message) => !aliasIds.has(message.messageId));
 
   if (!updatedMessages.some((message) => message.messageId === userMessage.messageId)) {

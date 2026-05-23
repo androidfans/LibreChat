@@ -302,8 +302,7 @@ export default function useStepHandler({
 
           // Get fresh messages to handle multi-tab scenarios where messages may have loaded
           // after this handler started (Tab 2 may have more complete history now)
-          const freshMessages = getMessages() || [];
-          const currentMessages = freshMessages.length > messages.length ? freshMessages : messages;
+          const currentMessages = getMessages() ?? messages;
 
           setMessages(
             upsertResponseMessage({
