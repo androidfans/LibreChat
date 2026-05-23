@@ -1,4 +1,5 @@
 import { LocalStorageKeys, TConversation, isUUID } from 'librechat-data-provider';
+import { SUBMITTED_DRAFT_PREFIX } from './drafts';
 
 export function getLocalStorageItems() {
   const items = {
@@ -70,6 +71,7 @@ export function clearAllConversationStorage() {
       key.startsWith(LocalStorageKeys.LAST_MCP_) ||
       key.startsWith(LocalStorageKeys.LAST_CODE_TOGGLE_) ||
       key.startsWith(LocalStorageKeys.TEXT_DRAFT) ||
+      key.startsWith(SUBMITTED_DRAFT_PREFIX) ||
       key.startsWith(LocalStorageKeys.ASST_ID_PREFIX) ||
       key.startsWith(LocalStorageKeys.AGENT_ID_PREFIX) ||
       key.startsWith(LocalStorageKeys.LAST_CONVO_SETUP)

@@ -26,7 +26,9 @@ import type { ConversationCursorData } from '~/utils';
 import {
   logger,
   setDraft,
+  getSubmittedDraft,
   scrollToEnd,
+  removeSubmittedDraft,
   getAllContentText,
   addConvoToAllQueries,
   updateConvoInAllQueries,
@@ -163,6 +165,49 @@ export const getConvoTitle = ({
     return cachedConvo?.title ?? currentConvo?.title ?? null;
   }
   return currentTitle;
+};
+
+const getSubmittedDraftIds = (
+  submission: EventSubmission,
+  requestMessage?: TMessage | null,
+): string[] =>
+  Array.from(
+    new Set(
+      [submission.userMessage?.messageId, requestMessage?.messageId].filter((id): id is string =>
+        Boolean(id),
+      ),
+    ),
+  );
+
+const clearSubmittedDraftRecovery = (
+  submission: EventSubmission,
+  requestMessage?: TMessage | null,
+) => {
+  getSubmittedDraftIds(submission, requestMessage).forEach(removeSubmittedDraft);
+};
+
+const restoreSubmittedDraftRecovery = ({
+  submission,
+  requestMessage,
+  draftId,
+  fallbackText,
+}: {
+  submission: EventSubmission;
+  requestMessage?: TMessage | null;
+  draftId?: string | Constants | null;
+  fallbackText?: string | null;
+}) => {
+  const ids = getSubmittedDraftIds(submission, requestMessage);
+  const recovery = ids.map((id) => getSubmittedDraft(id)).find(Boolean);
+  const text =
+    recovery?.text || fallbackText || requestMessage?.text || submission.userMessage?.text;
+  const targetDraftId = recovery?.conversationId || draftId || Constants.NEW_CONVO;
+
+  if (text) {
+    setDraft({ id: String(targetDraftId), value: text });
+  }
+
+  ids.forEach(removeSubmittedDraft);
 };
 
 export default function useEventHandlers({
@@ -444,6 +489,11 @@ export default function useEventHandlers({
           console.log(
             '[finalHandler] Early abort detected - no messages saved, staying on new chat',
           );
+          restoreSubmittedDraftRecovery({
+            submission,
+            requestMessage,
+            draftId: submissionConvo.conversationId || Constants.NEW_CONVO,
+          });
           setShowStopButton(false);
           setIsSubmitting(false);
           // Navigate to new chat if not already there
@@ -473,6 +523,7 @@ export default function useEventHandlers({
         const currentMessages = getMessages();
         /* Early return if messages are empty; i.e., the user navigated away */
         if (!currentMessages || currentMessages.length === 0) {
+          clearSubmittedDraftRecovery(submission, requestMessage);
           return;
         }
 
@@ -509,7 +560,11 @@ export default function useEventHandlers({
             currentConvoId === Constants.NEW_CONVO;
 
           setFinalMessages(currentConvoId, isNewChat ? [] : [...messages]);
-          setDraft({ id: currentConvoId, value: requestMessage?.text });
+          restoreSubmittedDraftRecovery({
+            submission,
+            requestMessage,
+            draftId: currentConvoId,
+          });
           if (isNewChat) {
             navigate(`/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
           }
@@ -578,6 +633,7 @@ export default function useEventHandlers({
             navigate(`/c/${conversation.conversationId}`, { replace: true });
           }
         }
+        clearSubmittedDraftRecovery(submission, requestMessage);
       } finally {
         setShowStopButton(false);
         setIsSubmitting(false);
@@ -649,6 +705,10 @@ export default function useEventHandlers({
             preset: tPresetSchema.parse(submission.conversation),
           });
         }
+        restoreSubmittedDraftRecovery({
+          submission,
+          draftId: conversationId || Constants.NEW_CONVO,
+        });
         setIsSubmitting(false);
         return;
       }
@@ -664,11 +724,16 @@ export default function useEventHandlers({
             preset: tPresetSchema.parse(submission.conversation),
           });
         }
+        restoreSubmittedDraftRecovery({
+          submission,
+          draftId: Constants.NEW_CONVO,
+        });
         setIsSubmitting(false);
         return;
       } else if (!receivedConvoId) {
         const errorResponse = parseErrorResponse(data);
         setErrorMessages(conversationId, errorResponse);
+        clearSubmittedDraftRecovery(submission);
         setIsSubmitting(false);
         return;
       }
@@ -687,6 +752,7 @@ export default function useEventHandlers({
         });
       }
 
+      clearSubmittedDraftRecovery(submission);
       setIsSubmitting(false);
       return;
     },

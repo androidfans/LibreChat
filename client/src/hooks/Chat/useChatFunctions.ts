@@ -26,7 +26,7 @@ import type { SetterOrUpdater } from 'recoil';
 import type { TAskFunction, ExtendedFile } from '~/common';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
 import useGetSender from '~/hooks/Conversations/useGetSender';
-import { logger, createDualMessageContent } from '~/utils';
+import { logger, removeDrafts, setSubmittedDraft, createDualMessageContent } from '~/utils';
 import store, { useGetEphemeralAgent } from '~/store';
 import useUserKey from '~/hooks/Input/useUserKey';
 import { useAuthContext } from '~/hooks';
@@ -120,6 +120,7 @@ export default function useChatFunctions({
 
     const ephemeralAgent = getEphemeralAgent(conversationId ?? Constants.NEW_CONVO);
     const isEditOrContinue = isEdited || isContinued;
+    const draftConversationId = conversationId || Constants.NEW_CONVO;
 
     let currentMessages: TMessage[] | null = overrideMessages ?? getMessages() ?? [];
 
@@ -209,6 +210,16 @@ export default function useChatFunctions({
       thread_id,
       error: false,
     };
+
+    if (!isRegenerate && !isEditOrContinue) {
+      setSubmittedDraft({
+        id: currentMsg.messageId,
+        text: currentMsg.text,
+        conversationId: draftConversationId,
+      });
+      removeDrafts(draftConversationId);
+      removeDrafts(Constants.PENDING_CONVO);
+    }
 
     const submissionFiles = overrideFiles ?? targetParentMessage?.files;
     const reuseFiles =
