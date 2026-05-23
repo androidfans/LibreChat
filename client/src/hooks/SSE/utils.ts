@@ -2,7 +2,7 @@ import type { TMessage } from 'librechat-data-provider';
 
 type ResponseAliasSubmission = {
   userMessage?: Pick<TMessage, 'messageId' | 'responseMessageId'> | null;
-  initialResponse?: Pick<TMessage, 'messageId'> | null;
+  initialResponse?: Partial<Pick<TMessage, 'messageId' | 'parentMessageId'>> | null;
 };
 
 export const getResponseAliasIds = ({
@@ -39,7 +39,19 @@ export const upsertResponseMessage = ({
     responseMessageId: response.messageId,
     userMessageId: userMessage.messageId,
   });
-  let updatedMessages = messages.filter((message) => !aliasIds.has(message.messageId));
+  const responseMessageBaseId = submission.userMessage?.responseMessageId?.replace(/_+$/, '');
+  const userAliasIds = new Set(
+    [
+      submission.userMessage?.messageId,
+      submission.initialResponse?.parentMessageId,
+      responseMessageBaseId,
+    ].filter((id): id is string => Boolean(id) && id !== userMessage.messageId),
+  );
+  let updatedMessages = messages.filter(
+    (message) =>
+      !aliasIds.has(message.messageId) &&
+      !(message.isCreatedByUser === true && userAliasIds.has(message.messageId)),
+  );
 
   if (!updatedMessages.some((message) => message.messageId === userMessage.messageId)) {
     updatedMessages = [...updatedMessages, userMessage];

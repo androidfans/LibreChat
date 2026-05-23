@@ -623,17 +623,24 @@ export default function useEventHandlers({
             location.pathname === `/c/${Constants.NEW_CONVO}` &&
             currentConvoId === Constants.NEW_CONVO;
 
+          const hasPersistedRequest = Boolean(
+            requestMessage?.messageId && requestMessage.conversationId,
+          );
           const noResponseMessages = upsertPersistedRequestMessage({
             messages: submission.messages,
             requestMessage,
           });
           setFinalMessages(currentConvoId, isNewChat ? [] : noResponseMessages);
-          restoreSubmittedDraftRecovery({
-            submission,
-            requestMessage,
-            draftId: currentConvoId,
-            saveDrafts,
-          });
+          if (hasPersistedRequest) {
+            clearSubmittedDraftRecovery(submission, requestMessage);
+          } else {
+            restoreSubmittedDraftRecovery({
+              submission,
+              requestMessage,
+              draftId: currentConvoId,
+              saveDrafts,
+            });
+          }
           if (isNewChat) {
             navigate(`/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
           }

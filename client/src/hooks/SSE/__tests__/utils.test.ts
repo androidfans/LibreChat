@@ -67,6 +67,43 @@ describe('upsertResponseMessage', () => {
     expect(result.map((msg) => msg.messageId)).toEqual(['root', 'user-real', 'response-real']);
     expect(result.some((msg) => msg.messageId === 'deleted-sibling')).toBe(false);
   });
+
+  it('replaces an optimistic user alias with the persisted user message', () => {
+    const persistedUser = message({ messageId: 'persisted-user', text: 'hello' });
+    const finalResponse = message({
+      messageId: 'persisted-response',
+      parentMessageId: 'persisted-user',
+      isCreatedByUser: false,
+      text: 'done',
+    });
+
+    const result = upsertResponseMessage({
+      messages: [
+        message({ messageId: 'root' }),
+        message({ messageId: 'optimistic-user', text: 'hello' }),
+        message({
+          messageId: 'optimistic-response',
+          parentMessageId: 'optimistic-user',
+          isCreatedByUser: false,
+        }),
+      ],
+      response: finalResponse,
+      userMessage: persistedUser,
+      submission: {
+        userMessage: { messageId: 'optimistic-user', responseMessageId: 'optimistic-user_' },
+        initialResponse: {
+          messageId: 'optimistic-response',
+          parentMessageId: 'optimistic-user',
+        },
+      },
+    });
+
+    expect(result.map((msg) => msg.messageId)).toEqual([
+      'root',
+      'persisted-user',
+      'persisted-response',
+    ]);
+  });
 });
 
 describe('filterOptimisticSubmissionMessages', () => {
