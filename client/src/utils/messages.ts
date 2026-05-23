@@ -164,12 +164,10 @@ export const scrollToEnd = (callback?: () => void) => {
 };
 
 /**
- * Clears messages for both the specified conversation ID and the NEW_CONVO query key.
- * This ensures that messages are properly cleared in all contexts, preventing stale data
- * from persisting in the NEW_CONVO cache.
+ * Clears transient chat message caches without erasing real conversation history.
  *
  * @param queryClient - The React Query client instance
- * @param conversationId - The conversation ID to clear messages for
+ * @param conversationId - The transient conversation ID to clear, if applicable
  */
 export const clearMessagesCache = (
   queryClient: QueryClient,
@@ -177,13 +175,15 @@ export const clearMessagesCache = (
 ): void => {
   const convoId = conversationId ?? Constants.NEW_CONVO;
 
-  // Clear messages for the current conversation
-  queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], []);
-
-  // Also clear NEW_CONVO messages if we're not already on NEW_CONVO
-  if (convoId !== Constants.NEW_CONVO) {
-    queryClient.setQueryData<TMessage[]>([QueryKeys.messages, Constants.NEW_CONVO], []);
+  if (
+    convoId === Constants.NEW_CONVO ||
+    convoId === Constants.PENDING_CONVO ||
+    convoId.startsWith('_')
+  ) {
+    queryClient.setQueryData<TMessage[]>([QueryKeys.messages, convoId], []);
   }
+
+  queryClient.setQueryData<TMessage[]>([QueryKeys.messages, Constants.NEW_CONVO], []);
 };
 
 export const getMessageAriaLabel = (message: TMessage, localize: LocalizeFunction): string => {

@@ -17,6 +17,7 @@ import { useGetStartupConfig, useGetUserBalance, queueTitleGeneration } from '~/
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
+import { getResponseAliasIds } from './utils';
 import store from '~/store';
 
 const clearDraft = (conversationId?: string | null) => {
@@ -254,6 +255,13 @@ export default function useResumableSSE(
               if (responseIdx < 0) {
                 responseIdx = messages.findIndex(
                   (m) =>
+                    m.messageId === currentSubmission.initialResponse?.messageId ||
+                    m.messageId === `${userMsgId}_`,
+                );
+              }
+              if (responseIdx < 0) {
+                responseIdx = messages.findIndex(
+                  (m) =>
                     !m.isCreatedByUser &&
                     (m.messageId === `${userMsgId}_` || m.parentMessageId === userMsgId),
                 );
@@ -270,14 +278,28 @@ export default function useResumableSSE(
 
               if (responseIdx >= 0) {
                 // Update existing response message with aggregatedContent
-                const updated = [...messages];
-                const oldContent = updated[responseIdx]?.content;
-                updated[responseIdx] = {
-                  ...updated[responseIdx],
+                const existingResponse = messages[responseIdx];
+                const oldContent = existingResponse?.content;
+                const responseId =
+                  serverResponseId ?? existingResponse?.messageId ?? `${userMsgId}_`;
+                const updatedResponse = {
+                  ...existingResponse,
+                  messageId: responseId,
+                  parentMessageId: userMsgId,
+                  conversationId: currentSubmission.conversation?.conversationId ?? '',
                   content: data.resumeState.aggregatedContent,
-                };
+                } as TMessage;
+                const aliasIds = getResponseAliasIds({
+                  submission: currentSubmission,
+                  userMessageId: userMsgId,
+                  responseMessageId: responseId,
+                });
+                const updated = messages.filter(
+                  (message, index) => index !== responseIdx && !aliasIds.has(message.messageId),
+                );
+                updated.push(updatedResponse);
                 console.log('[ResumableSSE] SYNC updating message', {
-                  messageId: updated[responseIdx]?.messageId,
+                  messageId: updatedResponse.messageId,
                   oldContentLength: Array.isArray(oldContent) ? oldContent.length : 0,
                   newContentLength: data.resumeState.aggregatedContent?.length,
                 });
@@ -285,13 +307,18 @@ export default function useResumableSSE(
                 // Sync both content handler and step handler with the updated message
                 // so subsequent deltas build on synced content, not stale content
                 resetContentHandler();
-                syncStepMessage(updated[responseIdx]);
+                syncStepMessage(updatedResponse);
                 console.log('[ResumableSSE] SYNC complete, handlers synced');
               } else {
                 // Add new response message
                 const responseId = serverResponseId ?? `${userMsgId}_`;
+                const aliasIds = getResponseAliasIds({
+                  submission: currentSubmission,
+                  userMessageId: userMsgId,
+                  responseMessageId: responseId,
+                });
                 setMessages([
-                  ...messages,
+                  ...messages.filter((message) => !aliasIds.has(message.messageId)),
                   {
                     messageId: responseId,
                     parentMessageId: userMsgId,
@@ -314,7 +341,10 @@ export default function useResumableSSE(
             if (text != null && index !== textIndex) {
               textIndex = index;
             }
-            contentHandler({ data, submission: currentSubmission as EventSubmission });
+            contentHandler({
+              data,
+              submission: { ...currentSubmission, userMessage } as EventSubmission,
+            });
             return;
           }
 

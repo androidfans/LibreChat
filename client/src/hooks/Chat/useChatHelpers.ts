@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
+import { Constants, QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRecoilState, useResetRecoilState, useSetRecoilState } from 'recoil';
 import type { TMessage } from 'librechat-data-provider';
@@ -44,8 +44,25 @@ export default function useChatHelpers(index = 0, paramId?: string) {
 
   const setMessages = useCallback(
     (messages: TMessage[]) => {
-      queryClient.setQueryData<TMessage[]>([QueryKeys.messages, queryParam], messages);
-      if (queryParam === 'new' && conversationId && conversationId !== 'new') {
+      const realConversationId = [...messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.conversationId &&
+            message.conversationId !== Constants.NEW_CONVO &&
+            message.conversationId !== Constants.PENDING_CONVO,
+        )?.conversationId;
+      const shouldWriteQueryParam =
+        !realConversationId ||
+        queryParam === Constants.NEW_CONVO ||
+        queryParam === realConversationId;
+
+      if (shouldWriteQueryParam) {
+        queryClient.setQueryData<TMessage[]>([QueryKeys.messages, queryParam], messages);
+      }
+      if (realConversationId && realConversationId !== queryParam) {
+        queryClient.setQueryData<TMessage[]>([QueryKeys.messages, realConversationId], messages);
+      } else if (queryParam === Constants.NEW_CONVO && conversationId && conversationId !== 'new') {
         queryClient.setQueryData<TMessage[]>([QueryKeys.messages, conversationId], messages);
       }
     },

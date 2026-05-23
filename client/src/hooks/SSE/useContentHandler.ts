@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { ContentTypes } from 'librechat-data-provider';
+import { Constants, ContentTypes } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type {
@@ -13,6 +13,7 @@ import type {
   TMessageContentParts,
 } from 'librechat-data-provider';
 import { addFileToCache } from '~/utils';
+import { getResponseAliasIds } from './utils';
 
 type TUseContentHandler = {
   setMessages: (messages: TMessage[]) => void;
@@ -38,10 +39,12 @@ export default function useContentHandler({ setMessages, getMessages }: TUseCont
       const { type, messageId, thread_id, conversationId, index } = data;
 
       const _messages = getMessages();
+      const aliasIds = getResponseAliasIds({ submission, responseMessageId: messageId });
       const messages =
-        _messages?.filter((m) => m.messageId !== messageId).map((msg) => ({ ...msg, thread_id })) ??
-        [];
-      const userMessage = messages[messages.length - 1] as TMessage | undefined;
+        _messages
+          ?.filter((m) => !aliasIds.has(m.messageId))
+          .map((msg) => ({ ...msg, thread_id })) ?? [];
+      const userMessage = submission.userMessage as TMessage | undefined;
 
       const { initialResponse } = submission;
 
@@ -49,11 +52,18 @@ export default function useContentHandler({ setMessages, getMessages }: TUseCont
       if (!response) {
         // Check if message already exists in current messages (e.g., after sync)
         // Use that as base instead of stale initialResponse
-        const existingMessage = _messages?.find((m) => m.messageId === messageId);
+        const existingMessage =
+          _messages?.find((m) => m.messageId === messageId) ??
+          _messages?.find(
+            (m) =>
+              m.messageId === initialResponse.messageId ||
+              (!!userMessage?.messageId && m.messageId === `${userMessage.messageId}_`),
+          );
         response = {
           ...(existingMessage ?? (initialResponse as TMessage)),
-          parentMessageId: userMessage?.messageId ?? '',
-          conversationId,
+          parentMessageId: userMessage?.messageId ?? Constants.NO_PARENT,
+          conversationId:
+            conversationId ?? userMessage?.conversationId ?? initialResponse.conversationId,
           messageId,
           thread_id,
         };
