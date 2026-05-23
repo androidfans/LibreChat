@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { LocalStorageKeys, Constants } from 'librechat-data-provider';
 import type { TFile } from 'librechat-data-provider';
 import type { ExtendedFile } from '~/common';
-import { clearDraft, getDraft, setDraft } from '~/utils';
+import { getDraft, removeDraft, setDraft } from '~/utils';
 import { useChatFormContext } from '~/Providers';
 import { useGetFiles } from '~/data-provider';
 import store from '~/store';
@@ -74,10 +74,7 @@ export const useAutoSave = ({
   const restoreText = useCallback(
     (id: string) => {
       const savedDraft = getDraft(id);
-      if (!savedDraft) {
-        return;
-      }
-      setValue('text', savedDraft);
+      setValue('text', savedDraft ?? '');
     },
     [setValue],
   );
@@ -89,7 +86,7 @@ export const useAutoSave = ({
       }
       // Save the draft of the current conversation before switching
       if (textAreaRef.current.value === '' || textAreaRef.current.value.length === 1) {
-        clearDraft(id);
+        removeDraft(id);
       } else {
         setDraft({ id, value: textAreaRef.current.value });
       }
@@ -177,13 +174,11 @@ export const useAutoSave = ({
           `${LocalStorageKeys.TEXT_DRAFT}${Constants.PENDING_CONVO}`,
         );
 
-        // Clear the pending text draft, if it exists, and save the current draft to the new conversationId;
-        // otherwise, save the current text area value to the new conversationId
-        localStorage.removeItem(`${LocalStorageKeys.TEXT_DRAFT}${Constants.PENDING_CONVO}`);
+        // Move only drafts explicitly captured while submitting. The textarea value may contain
+        // stale restored content during route/submission races, so don't use it as a fallback.
+        removeDraft(Constants.PENDING_CONVO);
         if (pendingDraft) {
           localStorage.setItem(`${LocalStorageKeys.TEXT_DRAFT}${conversationId}`, pendingDraft);
-        } else if (textAreaRef?.current?.value) {
-          setDraft({ id: conversationId, value: textAreaRef.current.value });
         }
         const pendingFileDraft = localStorage.getItem(
           `${LocalStorageKeys.FILES_DRAFT}${Constants.PENDING_CONVO}`,

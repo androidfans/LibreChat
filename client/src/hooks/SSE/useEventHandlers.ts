@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { v4 } from 'uuid';
-import { useSetRecoilState } from 'recoil';
+import { useRecoilValue, useSetRecoilState } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -26,7 +26,10 @@ import type { ConversationCursorData } from '~/utils';
 import {
   logger,
   setDraft,
+  setFileDraft,
+  getSubmittedDraft,
   scrollToEnd,
+  removeSubmittedDraft,
   getAllContentText,
   addConvoToAllQueries,
   updateConvoInAllQueries,
@@ -165,6 +168,92 @@ export const getConvoTitle = ({
   return currentTitle;
 };
 
+const getSubmittedDraftIds = (
+  submission: EventSubmission,
+  requestMessage?: TMessage | null,
+): string[] =>
+  Array.from(
+    new Set(
+      [
+        submission.userMessage?.messageId,
+        requestMessage?.messageId,
+        submission.initialResponse?.parentMessageId,
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  );
+
+const clearSubmittedDraftRecovery = (
+  submission: EventSubmission,
+  requestMessage?: TMessage | null,
+) => {
+  getSubmittedDraftIds(submission, requestMessage).forEach(removeSubmittedDraft);
+};
+
+const getMessageFileIds = (message?: TMessage | null) =>
+  (message?.files ?? [])
+    .map((file) => file.file_id ?? file.temp_file_id)
+    .filter((fileId): fileId is string => typeof fileId === 'string' && fileId.length > 0);
+
+const getTargetDraftId = ({
+  recoveryConversationId,
+  draftId,
+}: {
+  recoveryConversationId?: string | null;
+  draftId?: string | Constants | null;
+}) => {
+  const currentDraftId = draftId != null ? String(draftId) : '';
+
+  if (
+    currentDraftId &&
+    currentDraftId !== Constants.NEW_CONVO &&
+    currentDraftId !== Constants.PENDING_CONVO
+  ) {
+    return currentDraftId;
+  }
+
+  return recoveryConversationId || currentDraftId || Constants.NEW_CONVO;
+};
+
+const restoreSubmittedDraftRecovery = ({
+  submission,
+  requestMessage,
+  draftId,
+  fallbackText,
+  saveDrafts,
+}: {
+  submission: EventSubmission;
+  requestMessage?: TMessage | null;
+  draftId?: string | Constants | null;
+  fallbackText?: string | null;
+  saveDrafts: boolean;
+}) => {
+  const ids = getSubmittedDraftIds(submission, requestMessage);
+
+  if (!saveDrafts) {
+    ids.forEach(removeSubmittedDraft);
+    return;
+  }
+
+  const recovery = ids.map((id) => getSubmittedDraft(id)).find(Boolean);
+  const text =
+    recovery?.text || fallbackText || requestMessage?.text || submission.userMessage?.text;
+  const fileIds =
+    recovery?.fileIds && recovery.fileIds.length > 0
+      ? recovery.fileIds
+      : [...getMessageFileIds(requestMessage), ...getMessageFileIds(submission.userMessage)];
+  const targetDraftId = getTargetDraftId({
+    recoveryConversationId: recovery?.conversationId,
+    draftId,
+  });
+
+  if (text) {
+    setDraft({ id: String(targetDraftId), value: text });
+  }
+  setFileDraft({ id: String(targetDraftId), fileIds });
+
+  ids.forEach(removeSubmittedDraft);
+};
+
 export default function useEventHandlers({
   setMessages,
   getMessages,
@@ -186,6 +275,7 @@ export default function useEventHandlers({
   const lastAnnouncementTimeRef = useRef(Date.now());
   const { conversationId: paramId } = useParams();
   const { token } = useAuthContext();
+  const saveDrafts = useRecoilValue<boolean>(store.saveDrafts);
 
   const { contentHandler, resetContentHandler } = useContentHandler({ setMessages, getMessages });
   const { stepHandler, clearStepMaps, syncStepMessage } = useStepHandler({
@@ -444,6 +534,12 @@ export default function useEventHandlers({
           console.log(
             '[finalHandler] Early abort detected - no messages saved, staying on new chat',
           );
+          restoreSubmittedDraftRecovery({
+            submission,
+            requestMessage,
+            draftId: submissionConvo.conversationId || Constants.NEW_CONVO,
+            saveDrafts,
+          });
           setShowStopButton(false);
           setIsSubmitting(false);
           // Navigate to new chat if not already there
@@ -473,6 +569,7 @@ export default function useEventHandlers({
         const currentMessages = getMessages();
         /* Early return if messages are empty; i.e., the user navigated away */
         if (!currentMessages || currentMessages.length === 0) {
+          clearSubmittedDraftRecovery(submission, requestMessage);
           return;
         }
 
@@ -509,7 +606,12 @@ export default function useEventHandlers({
             currentConvoId === Constants.NEW_CONVO;
 
           setFinalMessages(currentConvoId, isNewChat ? [] : [...messages]);
-          setDraft({ id: currentConvoId, value: requestMessage?.text });
+          restoreSubmittedDraftRecovery({
+            submission,
+            requestMessage,
+            draftId: currentConvoId,
+            saveDrafts,
+          });
           if (isNewChat) {
             navigate(`/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
           }
@@ -578,6 +680,7 @@ export default function useEventHandlers({
             navigate(`/c/${conversation.conversationId}`, { replace: true });
           }
         }
+        clearSubmittedDraftRecovery(submission, requestMessage);
       } finally {
         setShowStopButton(false);
         setIsSubmitting(false);
@@ -595,6 +698,7 @@ export default function useEventHandlers({
       setIsSubmitting,
       setShowStopButton,
       location.pathname,
+      saveDrafts,
       applyAgentTemplate,
       attachmentHandler,
     ],
@@ -649,6 +753,11 @@ export default function useEventHandlers({
             preset: tPresetSchema.parse(submission.conversation),
           });
         }
+        restoreSubmittedDraftRecovery({
+          submission,
+          draftId: conversationId || Constants.NEW_CONVO,
+          saveDrafts,
+        });
         setIsSubmitting(false);
         return;
       }
@@ -664,11 +773,17 @@ export default function useEventHandlers({
             preset: tPresetSchema.parse(submission.conversation),
           });
         }
+        restoreSubmittedDraftRecovery({
+          submission,
+          draftId: Constants.NEW_CONVO,
+          saveDrafts,
+        });
         setIsSubmitting(false);
         return;
       } else if (!receivedConvoId) {
         const errorResponse = parseErrorResponse(data);
         setErrorMessages(conversationId, errorResponse);
+        clearSubmittedDraftRecovery(submission);
         setIsSubmitting(false);
         return;
       }
@@ -687,6 +802,7 @@ export default function useEventHandlers({
         });
       }
 
+      clearSubmittedDraftRecovery(submission);
       setIsSubmitting(false);
       return;
     },
@@ -696,6 +812,7 @@ export default function useEventHandlers({
       paramId,
       newConversation,
       setIsSubmitting,
+      saveDrafts,
       getMessages,
       queryClient,
     ],
