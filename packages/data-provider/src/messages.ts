@@ -1,7 +1,10 @@
 import type { TFile } from './types/files';
 import type { TMessage } from './types';
 
-export type ParentMessage = TMessage & { children: TMessage[]; depth: number };
+export type ParentMessage = Omit<TMessage, 'children' | 'depth'> & {
+  children: ParentMessage[];
+  depth: number;
+};
 export function buildTree({
   messages,
   fileMap,
@@ -14,7 +17,7 @@ export function buildTree({
   }
 
   const messageMap: Record<string, ParentMessage> = {};
-  const rootMessages: TMessage[] = [];
+  const rootMessages: ParentMessage[] = [];
   const childrenCount: Record<string, number> = {};
 
   messages.forEach((message) => {
@@ -36,15 +39,23 @@ export function buildTree({
     }
 
     messageMap[message.messageId] = extendedMessage;
+  });
 
+  Object.values(messageMap).forEach((extendedMessage) => {
+    const parentId = extendedMessage.parentMessageId ?? '';
     const parentMessage = messageMap[parentId];
     if (parentMessage) {
       parentMessage.children.push(extendedMessage);
-      extendedMessage.depth = parentMessage.depth + 1;
     } else {
       rootMessages.push(extendedMessage);
     }
   });
+
+  const assignDepth = (message: ParentMessage, depth: number) => {
+    message.depth = depth;
+    message.children.forEach((child) => assignDepth(child, depth + 1));
+  };
+  rootMessages.forEach((message) => assignDepth(message, 0));
 
   return rootMessages;
 }
