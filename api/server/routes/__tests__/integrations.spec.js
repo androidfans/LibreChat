@@ -1,17 +1,11 @@
 const express = require('express');
 const request = require('supertest');
 
-const mockCache = {
-  get: jest.fn(),
-  set: jest.fn(),
-};
-
 jest.mock('@librechat/data-schemas', () => ({
   logger: { error: jest.fn() },
 }));
 
 jest.mock('librechat-data-provider', () => ({
-  CacheKeys: { CONVERSATION_IMPORTS: 'CONVERSATION_IMPORTS' },
   ViolationTypes: { FILE_UPLOAD_LIMIT: 'FILE_UPLOAD_LIMIT' },
 }));
 
@@ -26,15 +20,23 @@ jest.mock('~/server/utils/import', () => ({
   importConversationData: jest.fn(),
 }));
 
-jest.mock('~/cache/getLogStores', () => jest.fn(() => mockCache));
+jest.mock('~/models/IntegrationImport', () => ({
+  claimIntegrationImport: jest.fn(),
+  completeIntegrationImport: jest.fn(),
+  releaseIntegrationImport: jest.fn(),
+}));
 
 describe('External conversation import', () => {
   const { importConversationData } = require('~/server/utils/import');
+  const {
+    claimIntegrationImport,
+    completeIntegrationImport,
+    releaseIntegrationImport,
+  } = require('~/models/IntegrationImport');
   let app;
 
   beforeAll(() => {
     app = express();
-    app.use(express.json());
     app.use('/api/integrations', require('../integrations'));
   });
 
@@ -44,8 +46,9 @@ describe('External conversation import', () => {
     process.env.CONVERSATION_IMPORT_USER_ID = 'user-123';
     process.env.DOMAIN_CLIENT = 'https://chat.example.com';
     delete process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES;
-    mockCache.get.mockResolvedValue(undefined);
-    mockCache.set.mockResolvedValue(true);
+    claimIntegrationImport.mockResolvedValue({ claimed: true });
+    completeIntegrationImport.mockResolvedValue({ modifiedCount: 1 });
+    releaseIntegrationImport.mockResolvedValue({ deletedCount: 1 });
     importConversationData.mockResolvedValue({
       conversations: [{ conversationId: 'conversation-123' }],
       messages: [{ conversationId: 'conversation-123', messageId: 'message-123' }],
@@ -83,7 +86,7 @@ describe('External conversation import', () => {
       jsonData: payload,
       requestUserId: 'user-123',
     });
-    expect(mockCache.set).toHaveBeenCalledTimes(1);
+    expect(completeIntegrationImport).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an invalid integration token', async () => {
@@ -102,6 +105,7 @@ describe('External conversation import', () => {
     const response = await request(app)
       .post('/api/integrations/v1/conversations/import')
       .set('Authorization', 'Bearer test-secret')
+      .set('Idempotency-Key', 'observation-123')
       .send(payload);
 
     expect(response.status).toBe(503);
@@ -109,12 +113,18 @@ describe('External conversation import', () => {
   });
 
   it('returns a cached conversation for an idempotent retry', async () => {
-    mockCache.get.mockResolvedValue({
-      conversationId: 'existing-conversation',
-      messageId: 'existing-message',
-      path: '/c/existing-conversation',
-      url: 'https://chat.example.com/c/existing-conversation',
-      created: true,
+    claimIntegrationImport.mockResolvedValue({
+      claimed: false,
+      record: {
+        status: 'completed',
+        response: {
+          conversationId: 'existing-conversation',
+          messageId: 'existing-message',
+          path: '/c/existing-conversation',
+          url: 'https://chat.example.com/c/existing-conversation',
+          created: true,
+        },
+      },
     });
 
     const response = await request(app)
@@ -147,10 +157,42 @@ describe('External conversation import', () => {
     const response = await request(app)
       .post('/api/integrations/v1/conversations/import')
       .set('Authorization', 'Bearer test-secret')
+      .set('Idempotency-Key', 'observation-123')
       .send(payload);
 
     expect(response.status).toBe(500);
     expect(response.body.error).toBe('Error importing conversation');
+    expect(releaseIntegrationImport).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns success when recording completion fails after persistence', async () => {
+    completeIntegrationImport.mockRejectedValue(new Error('Idempotency storage failure'));
+
+    const response = await request(app)
+      .post('/api/integrations/v1/conversations/import')
+      .set('Authorization', 'Bearer test-secret')
+      .set('Idempotency-Key', 'observation-123')
+      .send(payload);
+
+    expect(response.status).toBe(201);
+    expect(response.body.conversationId).toBe('conversation-123');
+    expect(releaseIntegrationImport).not.toHaveBeenCalled();
+  });
+
+  it('rejects a concurrent request while its shared claim is pending', async () => {
+    claimIntegrationImport.mockResolvedValue({
+      claimed: false,
+      record: { status: 'pending' },
+    });
+
+    const response = await request(app)
+      .post('/api/integrations/v1/conversations/import')
+      .set('Authorization', 'Bearer test-secret')
+      .set('Idempotency-Key', 'observation-123')
+      .send(payload);
+
+    expect(response.status).toBe(409);
+    expect(importConversationData).not.toHaveBeenCalled();
   });
 
   it('enforces the configured import size limit', async () => {

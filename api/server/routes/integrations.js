@@ -1,17 +1,30 @@
 const crypto = require('crypto');
 const express = require('express');
 const { logger } = require('@librechat/data-schemas');
-const { CacheKeys } = require('librechat-data-provider');
 const { createImportLimiters } = require('~/server/middleware');
 const requireConversationImportAuth = require('~/server/middleware/requireConversationImportAuth');
 const { importConversationData } = require('~/server/utils/import');
-const getLogStores = require('~/cache/getLogStores');
+const {
+  claimIntegrationImport,
+  completeIntegrationImport,
+  releaseIntegrationImport,
+} = require('~/models/IntegrationImport');
 
 const router = express.Router();
-const pendingImports = new Map();
 const MAX_IDEMPOTENCY_KEY_LENGTH = 256;
 
 const { importIpLimiter, importUserLimiter } = createImportLimiters();
+
+function parseImportJson(req, res, next) {
+  const configuredLimit = Number(process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES);
+  const limit = Number.isFinite(configuredLimit) && configuredLimit > 0 ? configuredLimit : '3mb';
+  return express.json({
+    limit,
+    verify: (request, _response, buffer) => {
+      request.importBodyBytes = buffer.length;
+    },
+  })(req, res, next);
+}
 
 function getConversationUrl(req, conversationId) {
   const path = `/c/${conversationId}`;
@@ -51,6 +64,7 @@ function getImportResponse(req, result, created) {
 router.post(
   '/v1/conversations/import',
   requireConversationImportAuth,
+  parseImportJson,
   importIpLimiter,
   importUserLimiter,
   async (req, res) => {
@@ -60,7 +74,7 @@ router.post(
     }
 
     const maxBytes = Number(process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES);
-    const requestBytes = Buffer.byteLength(JSON.stringify(req.body ?? null));
+    const requestBytes = req.importBodyBytes ?? 0;
     if (Number.isFinite(maxBytes) && maxBytes > 0 && requestBytes > maxBytes) {
       return res
         .status(413)
@@ -70,46 +84,46 @@ router.post(
     const keyHash = idempotencyKey
       ? crypto.createHash('sha256').update(`${req.user.id}:${idempotencyKey}`).digest('hex')
       : null;
-    const cache = getLogStores(CacheKeys.CONVERSATION_IMPORTS);
+    let claimedImport = false;
 
     try {
       if (keyHash) {
-        const cached = await cache.get(keyHash);
-        if (cached) {
-          return res.status(200).json({ ...cached, created: false });
+        const claim = await claimIntegrationImport({ keyHash, user: req.user.id });
+        if (!claim.claimed && claim.record?.status === 'completed') {
+          return res.status(200).json({ ...claim.record.response, created: false });
         }
-        if (pendingImports.has(keyHash)) {
-          const pendingResult = await pendingImports.get(keyHash);
-          return res.status(200).json({ ...pendingResult, created: false });
+        if (!claim.claimed) {
+          return res.status(409).json({ error: 'Import with this Idempotency-Key is in progress' });
         }
+        claimedImport = true;
       }
 
-      const executeImport = async () => {
-        const result = await importConversationData({
-          jsonData: req.body,
-          requestUserId: req.user.id,
-        });
-        const response = getImportResponse(req, result, true);
-        if (keyHash) {
-          await cache.set(keyHash, response);
-        }
-        return response;
-      };
-
-      const importPromise = executeImport();
+      const result = await importConversationData({
+        jsonData: req.body,
+        requestUserId: req.user.id,
+      });
+      const response = getImportResponse(req, result, true);
       if (keyHash) {
-        pendingImports.set(keyHash, importPromise);
-      }
-
-      try {
-        const response = await importPromise;
-        return res.status(201).json(response);
-      } finally {
-        if (keyHash) {
-          pendingImports.delete(keyHash);
+        try {
+          await completeIntegrationImport({
+            keyHash,
+            user: req.user.id,
+            response,
+          });
+        } catch (error) {
+          // The import is already durable; retaining the pending claim prevents a retry from duplicating it.
+          logger.error(`Failed to complete idempotency record ${keyHash}`, error);
         }
       }
+      return res.status(201).json(response);
     } catch (error) {
+      if (keyHash && claimedImport) {
+        try {
+          await releaseIntegrationImport({ keyHash, user: req.user.id });
+        } catch (releaseError) {
+          logger.error(`Failed to release idempotency record ${keyHash}`, releaseError);
+        }
+      }
       logger.error(`External conversation import failed for user ${req.user.id}`, error);
       const unsupported = error?.message === 'Unsupported import type';
       return res.status(unsupported ? 400 : 500).json({
