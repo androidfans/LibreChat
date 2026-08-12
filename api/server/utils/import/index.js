@@ -1,7 +1,8 @@
 const importers = require('./importers');
-const importConversations = require('./importConversations');
+const { importConversations, importConversationData } = require('./importConversations');
 
 module.exports = {
   ...importers,
   importConversations,
+  importConversationData,
 };

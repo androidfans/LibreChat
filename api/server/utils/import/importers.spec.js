@@ -530,6 +530,23 @@ describe('importLibreChatConvo', () => {
     expect(importBatchBuilder.saveBatch).toHaveBeenCalled();
   });
 
+  it('should propagate persistence failures', async () => {
+    mockedCacheGet.mockResolvedValue({
+      [EModelEndpoint.openAI]: {},
+    });
+    const jsonData = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '__data__', 'librechat-export.json'), 'utf8'),
+    );
+    const importBatchBuilder = new ImportBatchBuilder('user-123');
+    jest.spyOn(importBatchBuilder, 'saveBatch').mockRejectedValue(new Error('Database failure'));
+
+    const importer = getImporter(jsonData);
+
+    await expect(importer(jsonData, 'user-123', () => importBatchBuilder)).rejects.toThrow(
+      'Database failure',
+    );
+  });
+
   it('should import linear, non-recursive thread correctly with correct endpoint', async () => {
     mockedCacheGet.mockResolvedValue({
       [EModelEndpoint.azureOpenAI]: {},

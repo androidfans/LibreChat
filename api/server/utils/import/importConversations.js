@@ -22,8 +22,9 @@ const importConversations = async (job) => {
     const fileData = await fs.readFile(filepath, 'utf8');
     const jsonData = JSON.parse(fileData);
     const importer = getImporter(jsonData);
-    await importer(jsonData, requestUserId);
+    const result = await importer(jsonData, requestUserId);
     logger.debug(`user: ${requestUserId} | Finished importing conversations`);
+    return result;
   } catch (error) {
     logger.error(`user: ${requestUserId} | Failed to import conversation: `, error);
     throw error; // throw error all the way up so request does not return success
@@ -36,4 +37,14 @@ const importConversations = async (job) => {
   }
 };
 
-module.exports = importConversations;
+/**
+ * Imports conversation data that has already been parsed from JSON.
+ * @param {{ jsonData: object | object[], requestUserId: string }} job - Import input.
+ * @returns {Promise<{ conversations: object[], messages: object[] }>} Imported records.
+ */
+const importConversationData = async ({ jsonData, requestUserId }) => {
+  const importer = getImporter(jsonData);
+  return await importer(jsonData, requestUserId);
+};
+
+module.exports = { importConversations, importConversationData };

@@ -261,6 +261,7 @@ describe('Message Operations', () => {
         conversationId,
         user: 'user123',
         title: 'Test conversation',
+        endpoint: 'openAI',
         messages: (
           await Message.find({ conversationId, user: 'user123' }).select('_id').lean()
         ).map((message) => message._id),
@@ -306,6 +307,7 @@ describe('Message Operations', () => {
         conversationId,
         user: 'user123',
         title: 'Test conversation',
+        endpoint: 'openAI',
         messages: (
           await Message.find({ conversationId, user: 'user123' }).select('_id').lean()
         ).map((message) => message._id),
