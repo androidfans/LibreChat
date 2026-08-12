@@ -4,11 +4,7 @@ const { logger } = require('@librechat/data-schemas');
 const { createImportLimiters } = require('~/server/middleware');
 const requireConversationImportAuth = require('~/server/middleware/requireConversationImportAuth');
 const { importConversationData } = require('~/server/utils/import');
-const {
-  claimIntegrationImport,
-  completeIntegrationImport,
-  releaseIntegrationImport,
-} = require('~/models/IntegrationImport');
+const { claimIntegrationImport, completeIntegrationImport } = require('~/models/IntegrationImport');
 
 const router = express.Router();
 const MAX_IDEMPOTENCY_KEY_LENGTH = 256;
@@ -58,6 +54,17 @@ function getImportResponse(req, result, created) {
   };
 }
 
+function isLibreChatExport(data) {
+  return (
+    data != null &&
+    !Array.isArray(data) &&
+    typeof data === 'object' &&
+    typeof data.conversationId === 'string' &&
+    data.conversationId.length > 0 &&
+    (Array.isArray(data.messages) || Array.isArray(data.messagesTree))
+  );
+}
+
 /**
  * Imports a LibreChat export from an application/json request.
  */
@@ -81,11 +88,13 @@ router.post(
         .json({ error: `Conversation import exceeds the ${maxBytes} byte limit` });
     }
 
+    if (!isLibreChatExport(req.body)) {
+      return res.status(400).json({ error: 'Unsupported import type' });
+    }
+
     const keyHash = idempotencyKey
       ? crypto.createHash('sha256').update(`${req.user.id}:${idempotencyKey}`).digest('hex')
       : null;
-    let claimedImport = false;
-
     try {
       if (keyHash) {
         const claim = await claimIntegrationImport({ keyHash, user: req.user.id });
@@ -95,7 +104,6 @@ router.post(
         if (!claim.claimed) {
           return res.status(409).json({ error: 'Import with this Idempotency-Key is in progress' });
         }
-        claimedImport = true;
       }
 
       const result = await importConversationData({
@@ -117,13 +125,7 @@ router.post(
       }
       return res.status(201).json(response);
     } catch (error) {
-      if (keyHash && claimedImport) {
-        try {
-          await releaseIntegrationImport({ keyHash, user: req.user.id });
-        } catch (releaseError) {
-          logger.error(`Failed to release idempotency record ${keyHash}`, releaseError);
-        }
-      }
+      // Persistence is a parallel batch, so a failure may be partial; keep any claim to block duplicates.
       logger.error(`External conversation import failed for user ${req.user.id}`, error);
       const unsupported = error?.message === 'Unsupported import type';
       return res.status(unsupported ? 400 : 500).json({

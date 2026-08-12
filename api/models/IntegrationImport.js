@@ -26,12 +26,7 @@ async function completeIntegrationImport({ keyHash, user, response }) {
   );
 }
 
-async function releaseIntegrationImport({ keyHash, user }) {
-  return await IntegrationImport.deleteOne({ keyHash, user, status: 'pending' });
-}
-
 module.exports = {
   claimIntegrationImport,
   completeIntegrationImport,
-  releaseIntegrationImport,
 };

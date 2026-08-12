@@ -23,7 +23,6 @@ jest.mock('~/server/utils/import', () => ({
 jest.mock('~/models/IntegrationImport', () => ({
   claimIntegrationImport: jest.fn(),
   completeIntegrationImport: jest.fn(),
-  releaseIntegrationImport: jest.fn(),
 }));
 
 describe('External conversation import', () => {
@@ -31,7 +30,6 @@ describe('External conversation import', () => {
   const {
     claimIntegrationImport,
     completeIntegrationImport,
-    releaseIntegrationImport,
   } = require('~/models/IntegrationImport');
   let app;
 
@@ -48,7 +46,6 @@ describe('External conversation import', () => {
     delete process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES;
     claimIntegrationImport.mockResolvedValue({ claimed: true });
     completeIntegrationImport.mockResolvedValue({ modifiedCount: 1 });
-    releaseIntegrationImport.mockResolvedValue({ deletedCount: 1 });
     importConversationData.mockResolvedValue({
       conversations: [{ conversationId: 'conversation-123' }],
       messages: [{ conversationId: 'conversation-123', messageId: 'message-123' }],
@@ -140,8 +137,6 @@ describe('External conversation import', () => {
   });
 
   it('reports unsupported export data as a bad request', async () => {
-    importConversationData.mockRejectedValue(new Error('Unsupported import type'));
-
     const response = await request(app)
       .post('/api/integrations/v1/conversations/import')
       .set('Authorization', 'Bearer test-secret')
@@ -149,6 +144,19 @@ describe('External conversation import', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('Unsupported import type');
+    expect(importConversationData).not.toHaveBeenCalled();
+    expect(claimIntegrationImport).not.toHaveBeenCalled();
+  });
+
+  it('rejects multi-conversation export formats before persistence', async () => {
+    const response = await request(app)
+      .post('/api/integrations/v1/conversations/import')
+      .set('Authorization', 'Bearer test-secret')
+      .send([{ title: 'ChatGPT export', mapping: {} }]);
+
+    expect(response.status).toBe(400);
+    expect(importConversationData).not.toHaveBeenCalled();
+    expect(claimIntegrationImport).not.toHaveBeenCalled();
   });
 
   it('does not report success when persistence fails', async () => {
@@ -162,7 +170,7 @@ describe('External conversation import', () => {
 
     expect(response.status).toBe(500);
     expect(response.body.error).toBe('Error importing conversation');
-    expect(releaseIntegrationImport).toHaveBeenCalledTimes(1);
+    expect(claimIntegrationImport).toHaveBeenCalledTimes(1);
   });
 
   it('returns success when recording completion fails after persistence', async () => {
@@ -176,7 +184,6 @@ describe('External conversation import', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.conversationId).toBe('conversation-123');
-    expect(releaseIntegrationImport).not.toHaveBeenCalled();
   });
 
   it('rejects a concurrent request while its shared claim is pending', async () => {
