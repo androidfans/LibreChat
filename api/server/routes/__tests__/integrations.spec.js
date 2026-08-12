@@ -80,7 +80,7 @@ describe('External conversation import', () => {
       created: true,
     });
     expect(importConversationData).toHaveBeenCalledWith({
-      jsonData: payload,
+      jsonData: { ...payload, options: { tags: ['api-import'] } },
       requestUserId: 'user-123',
     });
     expect(completeIntegrationImport).toHaveBeenCalledTimes(1);
@@ -172,7 +172,28 @@ describe('External conversation import', () => {
 
     expect(response.status).toBe(201);
     expect(importConversationData).toHaveBeenCalledWith({
-      jsonData: { ...unsafePayload, options: { model: 'gpt-4' } },
+      jsonData: {
+        ...unsafePayload,
+        options: { model: 'gpt-4', tags: ['api-import'] },
+      },
+      requestUserId: 'user-123',
+    });
+  });
+
+  it('marks API imports while preserving caller-provided tags', async () => {
+    const taggedPayload = {
+      ...payload,
+      options: { tags: ['langfuse-import', 'api-import'] },
+    };
+
+    const response = await request(app)
+      .post('/api/integrations/v1/conversations/import')
+      .set('Authorization', 'Bearer test-secret')
+      .send(taggedPayload);
+
+    expect(response.status).toBe(201);
+    expect(importConversationData).toHaveBeenCalledWith({
+      jsonData: taggedPayload,
       requestUserId: 'user-123',
     });
   });

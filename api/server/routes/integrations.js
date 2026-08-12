@@ -9,6 +9,7 @@ const { claimIntegrationImport, completeIntegrationImport } = require('~/models/
 
 const router = express.Router();
 const MAX_IDEMPOTENCY_KEY_LENGTH = 256;
+const API_IMPORT_TAG = 'api-import';
 
 const { importIpLimiter, importUserLimiter } = createImportLimiters();
 
@@ -71,6 +72,21 @@ function isLibreChatExport(data) {
   );
 }
 
+function markApiImport(data) {
+  const options =
+    data.options && typeof data.options === 'object' && !Array.isArray(data.options)
+      ? data.options
+      : {};
+  const tags = Array.isArray(options.tags) ? options.tags : [];
+  return {
+    ...data,
+    options: {
+      ...options,
+      tags: [...new Set([...tags, API_IMPORT_TAG])],
+    },
+  };
+}
+
 /**
  * Imports a LibreChat export from an application/json request.
  */
@@ -114,7 +130,7 @@ router.post(
       }
 
       const result = await importConversationData({
-        jsonData: req.body,
+        jsonData: markApiImport(req.body),
         requestUserId: req.user.id,
       });
       const response = getImportResponse(req, result, true);
