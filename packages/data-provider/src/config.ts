@@ -1255,6 +1255,8 @@ export enum Time {
  * Enum for cache keys.
  */
 export enum CacheKeys {
+  /** External conversation import idempotency results. */
+  CONVERSATION_IMPORTS = 'CONVERSATION_IMPORTS',
   /**
    * Key for the config store namespace.
    */
