@@ -159,6 +159,24 @@ describe('External conversation import', () => {
     expect(claimIntegrationImport).not.toHaveBeenCalled();
   });
 
+  it('sanitizes MongoDB operator keys before import', async () => {
+    const unsafePayload = {
+      ...payload,
+      options: { model: 'gpt-4', $set: { user: 'attacker' } },
+    };
+
+    const response = await request(app)
+      .post('/api/integrations/v1/conversations/import')
+      .set('Authorization', 'Bearer test-secret')
+      .send(unsafePayload);
+
+    expect(response.status).toBe(201);
+    expect(importConversationData).toHaveBeenCalledWith({
+      jsonData: { ...unsafePayload, options: { model: 'gpt-4' } },
+      requestUserId: 'user-123',
+    });
+  });
+
   it('does not report success when persistence fails', async () => {
     importConversationData.mockRejectedValue(new Error('Database failure'));
 

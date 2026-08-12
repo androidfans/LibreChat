@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const express = require('express');
+const mongoSanitize = require('express-mongo-sanitize');
 const { logger } = require('@librechat/data-schemas');
 const { createImportLimiters } = require('~/server/middleware');
 const requireConversationImportAuth = require('~/server/middleware/requireConversationImportAuth');
@@ -20,6 +21,11 @@ function parseImportJson(req, res, next) {
       request.importBodyBytes = buffer.length;
     },
   })(req, res, next);
+}
+
+function sanitizeImportBody(req, _res, next) {
+  req.body = mongoSanitize.sanitize(req.body);
+  next();
 }
 
 function getConversationUrl(req, conversationId) {
@@ -71,9 +77,10 @@ function isLibreChatExport(data) {
 router.post(
   '/v1/conversations/import',
   requireConversationImportAuth,
-  parseImportJson,
   importIpLimiter,
   importUserLimiter,
+  parseImportJson,
+  sanitizeImportBody,
   async (req, res) => {
     const idempotencyKey = req.get('idempotency-key');
     if (idempotencyKey && idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
