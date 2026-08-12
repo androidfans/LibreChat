@@ -1,7 +1,22 @@
 const { Time } = require('librechat-data-provider');
 const { IntegrationImport } = require('~/db/models');
 
+let indexesReady;
+
+function ensureIntegrationImportIndexes() {
+  if (!indexesReady) {
+    // LibreChat disables Mongoose auto-indexing in production. This unique index is part of the
+    // correctness of the distributed claim, so create the schema indexes explicitly on first use.
+    indexesReady = IntegrationImport.createIndexes().catch((error) => {
+      indexesReady = null;
+      throw error;
+    });
+  }
+  return indexesReady;
+}
+
 async function claimIntegrationImport({ keyHash, user }) {
+  await ensureIntegrationImportIndexes();
   try {
     const record = await IntegrationImport.create({
       keyHash,
