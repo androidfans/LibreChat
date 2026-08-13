@@ -40,8 +40,8 @@ describe('External conversation import', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.CONVERSATION_IMPORT_API_KEY = 'test-secret';
-    process.env.CONVERSATION_IMPORT_USER_ID = 'user-123';
+    process.env.LIBRECHAT_CONVERSATION_IMPORT_API_KEY = 'test-secret';
+    process.env.LIBRECHAT_CONVERSATION_IMPORT_USER_ID = 'user-123';
     process.env.DOMAIN_CLIENT = 'https://chat.example.com';
     delete process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES;
     claimIntegrationImport.mockResolvedValue({ claimed: true });
@@ -53,8 +53,8 @@ describe('External conversation import', () => {
   });
 
   afterAll(() => {
-    delete process.env.CONVERSATION_IMPORT_API_KEY;
-    delete process.env.CONVERSATION_IMPORT_USER_ID;
+    delete process.env.LIBRECHAT_CONVERSATION_IMPORT_API_KEY;
+    delete process.env.LIBRECHAT_CONVERSATION_IMPORT_USER_ID;
     delete process.env.DOMAIN_CLIENT;
   });
 
@@ -97,7 +97,7 @@ describe('External conversation import', () => {
   });
 
   it('is unavailable when the target user is not configured', async () => {
-    delete process.env.CONVERSATION_IMPORT_USER_ID;
+    delete process.env.LIBRECHAT_CONVERSATION_IMPORT_USER_ID;
 
     const response = await request(app)
       .post('/api/integrations/v1/conversations/import')

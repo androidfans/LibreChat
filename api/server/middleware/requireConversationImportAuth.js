@@ -4,8 +4,8 @@ const crypto = require('crypto');
  * Authenticates machine-to-machine conversation imports from environment configuration.
  */
 function requireConversationImportAuth(req, res, next) {
-  const expectedKey = process.env.CONVERSATION_IMPORT_API_KEY;
-  const userId = process.env.CONVERSATION_IMPORT_USER_ID;
+  const expectedKey = process.env.LIBRECHAT_CONVERSATION_IMPORT_API_KEY;
+  const userId = process.env.LIBRECHAT_CONVERSATION_IMPORT_USER_ID;
 
   if (!expectedKey || !userId) {
     return res.status(503).json({ error: 'External conversation import is not configured' });
