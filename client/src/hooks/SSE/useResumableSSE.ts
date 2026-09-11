@@ -19,6 +19,7 @@ import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import { getResponseAliasIds } from './utils';
 import store from '~/store';
+import { traceMessage, messageTraceHeaders } from '~/utils/messageTrace';
 
 const clearDraft = (conversationId?: string | null) => {
   if (conversationId) {
@@ -168,7 +169,7 @@ export default function useResumableSSE(
       console.log('[ResumableSSE] Subscribing to stream:', url, { isResume });
 
       const sse = new SSE(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: `Bearer ${token}`, ...messageTraceHeaders() },
         method: 'GET',
       });
       sseRef.current = sse;
@@ -241,6 +242,11 @@ export default function useResumableSSE(
           }
 
           if (data.sync != null) {
+            traceMessage('stream.resumeSync', {
+              conversationId: currentStreamId,
+              requestMessageId: userMessage?.messageId,
+              responseMessageId: data.resumeState?.responseMessageId,
+            });
             console.log('[ResumableSSE] SYNC received', {
               runSteps: data.resumeState?.runSteps?.length ?? 0,
             });
@@ -386,6 +392,10 @@ export default function useResumableSSE(
        * This should trigger reconnection with exponential backoff, except for 404 errors.
        */
       sse.addEventListener('error', async (e: MessageEvent) => {
+        traceMessage('stream.networkError', {
+          conversationId: currentStreamId,
+          count: reconnectAttemptRef.current,
+        });
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
 
         /* @ts-ignore - sse.js types don't expose responseCode */
@@ -553,6 +563,11 @@ export default function useResumableSSE(
       clearStepMaps();
 
       const url = payloadData.server;
+      traceMessage('stream.start', {
+        conversationId: currentSubmission.conversation?.conversationId,
+        requestMessageId: currentSubmission.userMessage?.messageId,
+        parentMessageId: currentSubmission.userMessage?.parentMessageId,
+      });
 
       const maxRetries = 3;
       let lastError: unknown = null;
@@ -648,11 +663,17 @@ export default function useResumableSSE(
         let newStreamId: string | null = null;
         try {
           newStreamId = await startGeneration(submission);
-        } catch {
+        } catch (error) {
           if (cancelled || submissionRef.current !== submission) {
             return;
           }
-          errorHandler({ data: undefined, submission: submission as EventSubmission });
+          const response = (error as { response?: { data?: { code?: string; message?: string } } })
+            ?.response?.data;
+          errorHandler({
+            data: undefined,
+            submission: submission as EventSubmission,
+            errorText: response?.code === 'INVALID_MESSAGE_PARENT' ? response.message : undefined,
+          });
           setIsSubmitting(false);
           setShowStopButton(false);
           return;
@@ -686,6 +707,10 @@ export default function useResumableSSE(
 
     return () => {
       cancelled = true;
+      traceMessage('stream.cleanup', {
+        conversationId: submission.conversation?.conversationId,
+        requestMessageId: submission.userMessage?.messageId,
+      });
       console.log('[ResumableSSE] Cleanup - closing SSE, resetting UI state');
       // Cleanup on unmount/navigation - close connection but DO NOT abort backend
       // Reset UI state so it doesn't leak to other conversations

@@ -9,7 +9,7 @@ export default function useSubmitMessage() {
   const { user } = useAuthContext();
   const methods = useChatFormContext();
   const { conversation: addedConvo } = useAddedChatContext();
-  const { ask, index, conversation, getMessages, setMessages, latestMessage } = useChatContext();
+  const { ask, index } = useChatContext();
 
   const autoSendPrompts = useRecoilValue(store.autoSendPrompts);
   const setActivePrompt = useSetRecoilState(store.activePromptByIndex(index));
@@ -19,18 +19,6 @@ export default function useSubmitMessage() {
       if (!data) {
         return console.warn('No data provided to submitMessage');
       }
-      const rootMessages = getMessages();
-      const conversationId = conversation?.conversationId;
-      const latestConvoId = latestMessage?.conversationId;
-      const isSameConversation =
-        latestConvoId != null && latestConvoId !== '' && latestConvoId === conversationId;
-      const isLatestInRootMessages = rootMessages?.some(
-        (message) => message.messageId === latestMessage?.messageId,
-      );
-      if (!isLatestInRootMessages && latestMessage && isSameConversation) {
-        setMessages([...(rootMessages || []), latestMessage]);
-      }
-
       ask(
         {
           text: data.text,
@@ -41,15 +29,7 @@ export default function useSubmitMessage() {
       );
       methods.reset();
     },
-    [
-      ask,
-      methods,
-      addedConvo,
-      setMessages,
-      getMessages,
-      latestMessage,
-      conversation?.conversationId,
-    ],
+    [ask, methods, addedConvo],
   );
 
   const submitPrompt = useCallback(

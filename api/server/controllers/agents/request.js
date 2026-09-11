@@ -1,4 +1,5 @@
 const { logger } = require('@librechat/data-schemas');
+const messageTrace = require('~/server/utils/messageTrace');
 const { Constants } = require('librechat-data-provider');
 const {
   sendEvent,
@@ -312,6 +313,15 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       } catch (error) {
         // Check if this was an abort (not a real error)
         const wasAborted = job.abortController.signal.aborted || error.message?.includes('abort');
+        messageTrace.trace('generation.error', {
+          conversationId,
+          parentMessageId,
+          streamId,
+          stage: 'generation',
+          abortSignal: job.abortController.signal.aborted,
+          treatedAsAbort: Boolean(wasAborted),
+          ...messageTrace.classifyError(error),
+        });
 
         if (wasAborted) {
           logger.debug(`[ResumableAgentController] Generation aborted for ${streamId}`);
@@ -333,6 +343,12 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
     // Start generation and handle any unhandled errors
     startGeneration().catch((err) => {
+      messageTrace.trace('generation.error', {
+        conversationId,
+        streamId,
+        stage: 'background',
+        ...messageTrace.classifyError(err),
+      });
       logger.error(
         `[ResumableAgentController] Unhandled error in background generation: ${err.message}`,
       );
@@ -340,6 +356,13 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     });
   } catch (error) {
     logger.error('[ResumableAgentController] Initialization error:', error);
+    messageTrace.trace('generation.error', {
+      conversationId,
+      parentMessageId,
+      streamId,
+      stage: 'initialization',
+      ...messageTrace.classifyError(error),
+    });
     if (!res.headersSent) {
       res.status(500).json({ error: error.message || 'Failed to start generation' });
     } else {

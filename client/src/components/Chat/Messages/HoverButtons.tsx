@@ -21,6 +21,7 @@ import MessageAudio from './MessageAudio';
 import Feedback from './Feedback';
 import { cn } from '~/utils';
 import store from '~/store';
+import { traceMessage } from '~/utils/messageTrace';
 
 type THoverButtons = {
   isEditing: boolean;
@@ -204,6 +205,12 @@ const HoverButtons = ({
   const handleCopy = () => copyToClipboard(setIsCopied);
 
   const confirmDelete = () => {
+    traceMessage('action.deleteConfirmed', {
+      conversationId: targetConversationId,
+      routeConversationId: currentConvoId,
+      messageId: message.messageId,
+      parentMessageId: message.parentMessageId,
+    });
     deleteMessageSubtree.mutate(message.messageId, {
       onSuccess: (data) => {
         if (

@@ -12,6 +12,7 @@ const {
 } = require('~/server/middleware');
 const { v1 } = require('./v1');
 const chat = require('./chat');
+const { trace } = require('~/server/utils/messageTrace');
 
 const { LIMIT_CONCURRENT_MESSAGES, LIMIT_MESSAGE_IP, LIMIT_MESSAGE_USER } = process.env ?? {};
 
@@ -38,6 +39,7 @@ router.use('/', v1);
 router.get('/chat/stream/:streamId', async (req, res) => {
   const { streamId } = req.params;
   const isResume = req.query.resume === 'true';
+  trace('stream.subscribe', { streamId, isResume });
 
   const job = await GenerationJobManager.getJob(streamId);
   if (!job) {
@@ -108,6 +110,7 @@ router.get('/chat/stream/:streamId', async (req, res) => {
   }
 
   req.on('close', () => {
+    trace('stream.disconnect', { streamId });
     logger.debug(`[AgentStream] Client disconnected from ${streamId}`);
     result.unsubscribe();
   });
@@ -202,6 +205,7 @@ router.post('/chat/abort', async (req, res) => {
 
   if (job && jobStreamId) {
     logger.debug(`[AgentStream] Job found, aborting: ${jobStreamId}`);
+    trace('stream.abort', { streamId: jobStreamId, conversationId, userId });
     await GenerationJobManager.abortJob(jobStreamId);
     logger.debug(`[AgentStream] Job aborted successfully: ${jobStreamId}`);
     return res.json({ success: true, aborted: jobStreamId });

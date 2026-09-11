@@ -30,6 +30,7 @@ const configureSocialLogins = require('./socialLogins');
 const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
 const noIndex = require('./middleware/noIndex');
+const { requestTrace } = require('./utils/messageTrace');
 const { seedDatabase } = require('~/models');
 const routes = require('./routes');
 
@@ -82,6 +83,7 @@ const startServer = async () => {
 
   /* Middleware */
   app.use(noIndex);
+  app.use(requestTrace);
   app.use('/api/integrations', routes.integrations);
   app.use(express.json({ limit: '3mb' }));
   app.use(express.urlencoded({ extended: true, limit: '3mb' }));
@@ -140,6 +142,7 @@ const startServer = async () => {
   app.use('/api/user', routes.user);
   app.use('/api/search', routes.search);
   app.use('/api/messages', routes.messages);
+  app.use('/api/diagnostics/messages', require('./routes/messageDiagnostics'));
   app.use('/api/convos', routes.convos);
   app.use('/api/presets', routes.presets);
   app.use('/api/prompts', routes.prompts);

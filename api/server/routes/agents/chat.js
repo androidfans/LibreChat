@@ -12,6 +12,7 @@ const { initializeClient } = require('~/server/services/Endpoints/agents');
 const AgentController = require('~/server/controllers/agents/request');
 const addTitle = require('~/server/services/Endpoints/agents/title');
 const { getRoleByName } = require('~/models/Role');
+const validateChatParent = require('~/server/middleware/validate/chatParent');
 
 const router = express.Router();
 
@@ -29,6 +30,7 @@ router.use(moderateText);
 router.use(checkAgentAccess);
 router.use(checkAgentResourceAccess);
 router.use(validateConvoAccess);
+router.use(validateChatParent);
 router.use(buildEndpointOption);
 
 const controller = async (req, res, next) => {

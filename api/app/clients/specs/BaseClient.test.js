@@ -215,6 +215,38 @@ describe('BaseClient', () => {
     expect(result.messagesToRefine).toEqual(expectedMessagesToRefine);
   });
 
+  test('context trimming traces discarded IDs without mutating the source graph or deleting history', async () => {
+    const messageTrace = require('~/server/utils/messageTrace');
+    const models = require('~/models');
+    const enabled = jest.spyOn(messageTrace, 'enabled').mockReturnValue(true);
+    const traceMessages = jest.spyOn(messageTrace, 'traceMessages').mockImplementation(() => {});
+    const messages = Object.freeze([
+      Object.freeze({ messageId: 'root', parentMessageId: Constants.NO_PARENT, tokenCount: 40 }),
+      Object.freeze({ messageId: 'reply', parentMessageId: 'root', tokenCount: 10 }),
+      Object.freeze({ messageId: 'latest', parentMessageId: 'reply', tokenCount: 5 }),
+    ]);
+    try {
+      const result = await TestClient.getMessagesWithinTokenLimit({
+        messages,
+        maxContextTokens: 25,
+      });
+      expect(result.context.map((message) => message.messageId)).toEqual(['reply', 'latest']);
+      expect(result.context[0].parentMessageId).toBe('root');
+      expect(traceMessages).toHaveBeenCalledWith(
+        'context.dropped',
+        [messages[0]],
+        expect.objectContaining({ keptCount: 2, droppedCount: 1, remainingContextTokens: 7 }),
+      );
+      expect(models.deleteMessages).not.toHaveBeenCalled();
+      expect(models.deleteMessagesSince).not.toHaveBeenCalled();
+      expect(models.saveMessage).not.toHaveBeenCalled();
+      expect(models.updateMessage).not.toHaveBeenCalled();
+    } finally {
+      enabled.mockRestore();
+      traceMessages.mockRestore();
+    }
+  });
+
   describe('getMessagesForConversation', () => {
     it('should return an empty array if the parentMessageId does not exist', () => {
       const result = TestClient.constructor.getMessagesForConversation({
