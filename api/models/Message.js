@@ -2,8 +2,26 @@ const { z } = require('zod');
 const { logger } = require('@librechat/data-schemas');
 const { createTempChatExpirationDate } = require('@librechat/api');
 const { Message, Conversation } = require('~/db/models');
+const messageTrace = require('~/server/utils/messageTrace');
 
 const idSchema = z.string().uuid();
+
+async function traceDeletion(filter, source) {
+  if (!messageTrace.enabled()) {
+    return;
+  }
+  try {
+    const messages = await Message.find(filter)
+      .select('messageId parentMessageId conversationId user expiredAt')
+      .lean();
+    messageTrace.traceMessages('db.delete.targets', messages, {
+      source,
+      filter: messageTrace.structural(filter),
+    });
+  } catch (error) {
+    messageTrace.trace('db.delete.traceFailed', { source, errorCode: error.code });
+  }
+}
 
 /**
  * Saves a message in the database.
@@ -53,6 +71,12 @@ async function saveMessage(req, params, metadata) {
       user: req.user.id,
       messageId: params.newMessageId || params.messageId,
     };
+    messageTrace.trace('message.save', {
+      source: metadata?.context,
+      originRequestId: req.messageTraceId,
+      message: messageTrace.structural(params),
+      userId: req.user.id,
+    });
 
     if (req?.body?.isTemporary) {
       try {
@@ -287,6 +311,14 @@ async function deleteMessagesSince(req, { messageId, conversationId }) {
     const message = await Message.findOne({ messageId, user: req.user.id }).lean();
 
     if (message) {
+      await traceDeletion(
+        {
+          conversationId,
+          user: req.user.id,
+          createdAt: { $gt: message.createdAt },
+        },
+        'deleteMessagesSince',
+      );
       const query = Message.find({ conversationId, user: req.user.id });
       return await query.deleteMany({
         createdAt: { $gt: message.createdAt },
@@ -310,11 +342,21 @@ async function deleteMessagesSince(req, { messageId, conversationId }) {
  */
 async function getMessages(filter, select) {
   try {
+    const query = Message.find(filter);
     if (select) {
-      return await Message.find(filter).select(select).sort({ createdAt: 1 }).lean();
+      query.select(select);
     }
-
-    return await Message.find(filter).sort({ createdAt: 1 }).lean();
+    const messages = await query.sort({ createdAt: 1 }).lean();
+    if (
+      filter.conversationId &&
+      (!select || select.startsWith('-') || select.includes('parentMessageId'))
+    ) {
+      messageTrace.traceMessages('db.messages.read', messages, {
+        filter: messageTrace.structural(filter),
+        select,
+      });
+    }
+    return messages;
   } catch (err) {
     logger.error('Error getting messages:', err);
     throw err;
@@ -352,6 +394,7 @@ async function getMessage({ user, messageId }) {
  */
 async function deleteMessages(filter) {
   try {
+    await traceDeletion(filter, 'deleteMessages');
     return await Message.deleteMany(filter);
   } catch (err) {
     logger.error('Error deleting messages:', err);
@@ -408,6 +451,10 @@ async function getMessageSubtree(messageId, conversationId, userId) {
 async function deleteMessageSubtree(messageId, conversationId, userId) {
   try {
     const messageIds = await getMessageSubtree(messageId, conversationId, userId);
+    await traceDeletion(
+      { messageId: { $in: messageIds }, conversationId, user: userId },
+      'deleteMessageSubtree',
+    );
     const result = await Message.deleteMany({
       messageId: { $in: messageIds },
       conversationId,

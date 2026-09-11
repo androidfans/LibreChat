@@ -128,26 +128,22 @@ describe('Message Operations', () => {
     it('should delete messages only for the authenticated user', async () => {
       const conversationId = uuidv4();
 
-      // Create multiple messages in the same conversation
-      await saveMessage(mockReq, {
-        messageId: 'msg1',
+      // Explicit times keep this strict createdAt comparison independent of database speed.
+      await Message.create(
+        ['msg1', 'msg2', 'msg3'].map((messageId, index) => ({
+          messageId,
+          conversationId,
+          text: messageId,
+          user: 'user123',
+          createdAt: new Date(Date.UTC(2025, 0, 1, 0, 0, index)),
+        })),
+      );
+      await Message.create({
+        messageId: 'other-user-message',
         conversationId,
-        text: 'First message',
-        user: 'user123',
-      });
-
-      await saveMessage(mockReq, {
-        messageId: 'msg2',
-        conversationId,
-        text: 'Second message',
-        user: 'user123',
-      });
-
-      await saveMessage(mockReq, {
-        messageId: 'msg3',
-        conversationId,
-        text: 'Third message',
-        user: 'user123',
+        text: 'Another user',
+        user: 'other-user',
+        createdAt: new Date(Date.UTC(2025, 0, 1, 0, 0, 3)),
       });
 
       // Delete messages since message2 (this should only delete messages created AFTER msg2)
@@ -162,6 +158,7 @@ describe('Message Operations', () => {
       expect(remainingMessages.map((m) => m.messageId)).toContain('msg1');
       expect(remainingMessages.map((m) => m.messageId)).toContain('msg2');
       expect(remainingMessages.map((m) => m.messageId)).not.toContain('msg3');
+      expect(await Message.exists({ messageId: 'other-user-message' })).toBeTruthy();
     });
 
     it('should return undefined if no message is found', async () => {

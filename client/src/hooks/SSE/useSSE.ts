@@ -17,6 +17,7 @@ import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
 import store from '~/store';
+import { messageTraceHeaders } from '~/utils/messageTrace';
 
 const clearDraft = (conversationId?: string | null) => {
   if (conversationId) {
@@ -104,7 +105,11 @@ export default function useSSE(
 
     const sse = new SSE(payloadData.server, {
       payload: JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...messageTraceHeaders(),
+      },
     });
 
     sse.addEventListener('attachment', (e: MessageEvent) => {

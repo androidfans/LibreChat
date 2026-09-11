@@ -50,6 +50,8 @@
 
 刘立加的改动文档请参考 CUSTOM_README.md
 
+For message ancestry troubleshooting, see [diagnostic switches, logs, and deployment instructions](docs/development/message-tracing.md).
+
 # ✨ Features
 
 - 🖥️ **UI & Experience** inspired by ChatGPT with enhanced design and features

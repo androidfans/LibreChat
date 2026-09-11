@@ -26,6 +26,8 @@ import type { SetterOrUpdater } from 'recoil';
 import type { TAskFunction, ExtendedFile } from '~/common';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
 import useGetSender from '~/hooks/Conversations/useGetSender';
+import useGetSelectedMessage from '~/hooks/Messages/useGetSelectedMessage';
+import { traceMessage } from '~/utils/messageTrace';
 import { logger, removeDrafts, setSubmittedDraft, createDualMessageContent } from '~/utils';
 import store, { useGetEphemeralAgent } from '~/store';
 import useUserKey from '~/hooks/Input/useUserKey';
@@ -49,7 +51,7 @@ export default function useChatFunctions({
   getMessages,
   setMessages,
   isSubmitting,
-  latestMessage,
+  latestMessage: renderedLatestMessage,
   setSubmission,
   setLatestMessage,
   conversation: immutableConversation,
@@ -68,6 +70,7 @@ export default function useChatFunctions({
 }) {
   const navigate = useNavigate();
   const getSender = useGetSender();
+  const getSelectedMessage = useGetSelectedMessage();
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
   const setFilesToDelete = useSetFilesToDelete();
@@ -119,11 +122,6 @@ export default function useChatFunctions({
       return;
     }
 
-    if (isContinued && !latestMessage) {
-      console.error('cannot continue AI message without latestMessage!');
-      return;
-    }
-
     const ephemeralAgent = getEphemeralAgent(conversationId ?? Constants.NEW_CONVO);
     const isEditOrContinue = isEdited || isContinued;
     const draftConversationId = conversationId || Constants.NEW_CONVO;
@@ -131,6 +129,15 @@ export default function useChatFunctions({
       files && files.size > 0 ? Array.from(files.keys()) : getMessageFileIds(overrideFiles);
 
     let currentMessages: TMessage[] | null = overrideMessages ?? getMessages() ?? [];
+    const latestMessage =
+      isEditOrContinue || isRegenerate
+        ? renderedLatestMessage
+        : getSelectedMessage(currentMessages, conversationId);
+
+    if (isContinued && !latestMessage) {
+      console.error('cannot continue AI message without latestMessage!');
+      return;
+    }
 
     if (conversation?.promptPrefix) {
       conversation.promptPrefix = replaceSpecialVars({
@@ -144,6 +151,17 @@ export default function useChatFunctions({
     text = text.trim();
     const intermediateId = overrideUserMessageId ?? v4();
     parentMessageId = parentMessageId ?? latestMessage?.messageId ?? Constants.NO_PARENT;
+    traceMessage('action.ask', {
+      conversationId,
+      parentMessageId,
+      latestMessageId: renderedLatestMessage?.messageId,
+      selectedMessageId: latestMessage?.messageId,
+      requestMessageId: intermediateId,
+      count: currentMessages.length,
+      isRegenerate,
+      isContinued,
+      isEdited,
+    });
 
     logChatRequest({
       index,

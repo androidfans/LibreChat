@@ -7,6 +7,7 @@ import MessageContent from '~/components/Messages/MessageContent';
 import MessageParts from './MessageParts';
 import Message from './Message';
 import store from '~/store';
+import { traceMessage } from '~/utils/messageTrace';
 
 export default function MultiMessage({
   // messageId is used recursively here
@@ -17,12 +18,29 @@ export default function MultiMessage({
 }: TMessageProps) {
   const [siblingIdx, setSiblingIdx] = useRecoilState(store.messagesSiblingIdxFamily(messageId));
   const prevLengthRef = useRef<number | undefined>(undefined);
+  const selected = messagesTree?.[messagesTree.length - siblingIdx - 1];
+  useEffect(() => {
+    traceMessage('branch.render', {
+      conversationId: selected?.conversationId,
+      parentMessageId: messageId,
+      selectedMessageId: selected?.messageId,
+      siblingIndex: siblingIdx,
+      siblingCount: messagesTree?.length ?? 0,
+    });
+  }, [messageId, selected?.messageId, selected?.conversationId, siblingIdx, messagesTree?.length]);
 
   const setSiblingIdxRev = useCallback(
     (value: number) => {
+      traceMessage('branch.switch', {
+        parentMessageId: messageId,
+        selectedMessageId: messagesTree?.[value]?.messageId,
+        siblingIndex: value,
+        siblingCount: messagesTree?.length ?? 0,
+        conversationId: messagesTree?.[value]?.conversationId,
+      });
       setSiblingIdx((messagesTree?.length ?? 0) - value - 1);
     },
-    [messagesTree?.length, setSiblingIdx],
+    [messagesTree, messageId, setSiblingIdx],
   );
 
   useEffect(() => {
@@ -30,16 +48,28 @@ export default function MultiMessage({
     // not when switching back to a conversation (which preserves the previous sibling state)
     const currentLength = messagesTree?.length ?? 0;
     if (prevLengthRef.current !== undefined && currentLength > prevLengthRef.current) {
+      traceMessage('branch.reset', {
+        parentMessageId: messageId,
+        reason: 'siblings-grew',
+        count: currentLength,
+        previousCount: prevLengthRef.current,
+      });
       setSiblingIdx(0);
     }
     prevLengthRef.current = currentLength;
-  }, [messagesTree?.length, setSiblingIdx]);
+  }, [messagesTree?.length, setSiblingIdx, messageId]);
 
   useEffect(() => {
     if (messagesTree?.length && siblingIdx >= messagesTree.length) {
+      traceMessage('branch.reset', {
+        parentMessageId: messageId,
+        reason: 'index-out-of-bounds',
+        siblingIndex: siblingIdx,
+        siblingCount: messagesTree.length,
+      });
       setSiblingIdx(0);
     }
-  }, [siblingIdx, messagesTree?.length, setSiblingIdx]);
+  }, [siblingIdx, messagesTree?.length, setSiblingIdx, messageId]);
 
   if (!(messagesTree && messagesTree.length)) {
     return null;

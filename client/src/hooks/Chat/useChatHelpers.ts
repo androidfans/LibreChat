@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { Constants, QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -15,6 +15,7 @@ import useChatFunctions from '~/hooks/Chat/useChatFunctions';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useNewConvo from '~/hooks/useNewConvo';
 import { logger } from '~/utils';
+import { traceMessage } from '~/utils/messageTrace';
 import store from '~/store';
 
 type StopSubmissionTarget = {
@@ -132,6 +133,21 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const resetLatestMessage = useResetRecoilState(store.latestMessageFamily(index));
   const [isSubmitting, setIsSubmitting] = useRecoilState(store.isSubmittingFamily(index));
   const [latestMessage, setLatestMessage] = useRecoilState(store.latestMessageFamily(index));
+  useEffect(() => {
+    traceMessage('state.latest', {
+      conversationId: latestMessage?.conversationId,
+      routeConversationId: queryParam,
+      messageId: latestMessage?.messageId,
+      parentMessageId: latestMessage?.parentMessageId,
+      source: `chat-${index}`,
+    });
+  }, [
+    latestMessage?.messageId,
+    latestMessage?.parentMessageId,
+    latestMessage?.conversationId,
+    queryParam,
+    index,
+  ]);
   const setSiblingIdx = useSetRecoilState(
     store.messagesSiblingIdxFamily(latestMessage?.parentMessageId ?? null),
   );
@@ -152,6 +168,13 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         !realConversationId ||
         queryParam === Constants.NEW_CONVO ||
         queryParam === realConversationId;
+      if (!shouldWriteQueryParam) {
+        traceMessage('cache.redirect', {
+          routeConversationId: queryParam,
+          targetConversationId: realConversationId,
+          count: messages.length,
+        });
+      }
 
       if (shouldWriteQueryParam) {
         queryClient.setQueryData<TMessage[]>([QueryKeys.messages, queryParam], messages);

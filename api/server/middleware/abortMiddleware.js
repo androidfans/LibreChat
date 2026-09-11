@@ -1,4 +1,5 @@
 const { logger } = require('@librechat/data-schemas');
+const messageTrace = require('~/server/utils/messageTrace');
 const {
   countTokens,
   isEnabled,
@@ -126,6 +127,14 @@ const handleAbort = function () {
  * @returns {Promise<void>}
  */
 const handleAbortError = async (res, req, error, data) => {
+  messageTrace.trace('generation.error', {
+    conversationId: data?.conversationId ?? req.body?.conversationId,
+    messageId: data?.messageId,
+    parentMessageId: data?.parentMessageId,
+    stage: 'abort-handler',
+    hasPartialText: Boolean(data?.partialText),
+    ...messageTrace.classifyError(error),
+  });
   if (error?.message?.includes('base64')) {
     logger.error('[handleAbortError] Error in base64 encoding', {
       ...error,

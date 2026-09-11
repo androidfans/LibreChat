@@ -51,6 +51,7 @@ import {
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
 import { useLiveAnnouncer } from '~/Providers';
 import store from '~/store';
+import { traceMessage } from '~/utils/messageTrace';
 
 type TSyncData = {
   sync: boolean;
@@ -323,6 +324,12 @@ export default function useEventHandlers({
 
   const cancelHandler = useCallback(
     (data: TResData, submission: EventSubmission) => {
+      traceMessage('stream.cancel', {
+        conversationId: submission.userMessage?.conversationId,
+        submissionConversationId: submission.conversation?.conversationId,
+        requestMessageId: submission.userMessage?.messageId,
+        responseMessageId: submission.initialResponse?.messageId,
+      });
       const { requestMessage, responseMessage, conversation } = data;
       const { messages, isRegenerate = false } = submission;
       const convoUpdate =
@@ -358,6 +365,12 @@ export default function useEventHandlers({
 
   const syncHandler = useCallback(
     (data: TSyncData, submission: EventSubmission) => {
+      traceMessage('stream.sync', {
+        conversationId: submission.userMessage?.conversationId,
+        submissionConversationId: submission.conversation?.conversationId,
+        requestMessageId: submission.userMessage?.messageId,
+        responseMessageId: submission.initialResponse?.messageId,
+      });
       const { conversationId, thread_id, responseMessage, requestMessage } = data;
       const { initialResponse, messages: _messages, userMessage } = submission;
       const messages = filterOptimisticSubmissionMessages({
@@ -438,6 +451,12 @@ export default function useEventHandlers({
 
   const createdHandler = useCallback(
     (data: TResData, submission: EventSubmission) => {
+      traceMessage('stream.created', {
+        conversationId: submission.userMessage?.conversationId,
+        submissionConversationId: submission.conversation?.conversationId,
+        requestMessageId: submission.userMessage?.messageId,
+        responseMessageId: submission.initialResponse?.messageId,
+      });
       queryClient.invalidateQueries([QueryKeys.mcpConnectionStatus]);
       const { messages, userMessage, isRegenerate = false, isTemporary = false } = submission;
       const initialResponse = {
@@ -538,6 +557,12 @@ export default function useEventHandlers({
 
   const finalHandler = useCallback(
     (data: TFinalResData, submission: EventSubmission) => {
+      traceMessage('stream.final', {
+        conversationId: submission.userMessage?.conversationId,
+        submissionConversationId: submission.conversation?.conversationId,
+        requestMessageId: submission.userMessage?.messageId,
+        responseMessageId: submission.initialResponse?.messageId,
+      });
       const { requestMessage, responseMessage, conversation, runMessages } = data;
       const { conversation: submissionConvo } = submission;
 
@@ -797,7 +822,20 @@ export default function useEventHandlers({
   );
 
   const errorHandler = useCallback(
-    ({ data, submission }: { data?: TResData; submission: EventSubmission }) => {
+    ({
+      data,
+      submission,
+      errorText,
+    }: {
+      data?: TResData;
+      submission: EventSubmission;
+      errorText?: string;
+    }) => {
+      traceMessage('stream.error', {
+        conversationId: submission.userMessage?.conversationId,
+        requestMessageId: submission.userMessage?.messageId,
+        responseMessageId: submission.initialResponse?.messageId,
+      });
       const { messages, userMessage, initialResponse } = submission;
       setCompleted((prev) => new Set(prev.add(initialResponse.messageId)));
 
@@ -834,7 +872,7 @@ export default function useEventHandlers({
       if (!data) {
         const convoId = conversationId || `_${v4()}`;
         const errorMetadata = parseErrorResponse({
-          text: 'Error connecting to server, try refreshing the page.',
+          text: errorText ?? 'Error connecting to server, try refreshing the page.',
           ...submission,
           conversationId: convoId,
         });

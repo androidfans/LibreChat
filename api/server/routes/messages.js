@@ -402,7 +402,13 @@ router.put('/:conversationId/:messageId/feedback', validateMessageReq, async (re
 router.delete('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
   try {
     const { messageId } = req.params;
-    await deleteMessages({ messageId });
+    const result = await deleteMessages({ messageId });
+    logger.info('[messages.delete] Deleted message', {
+      user: req.user.id,
+      conversationId: req.params.conversationId,
+      messageId,
+      deletedCount: result.deletedCount,
+    });
     res.status(204).send();
   } catch (error) {
     logger.error('Error deleting message:', error);
@@ -420,6 +426,13 @@ router.delete('/:conversationId/:messageId/subtree', validateMessageReq, async (
     ]);
     const lastMessage = messages[messages.length - 1];
     const result = await deleteMessageSubtree(messageId, conversationId, userId);
+    logger.info('[messages.deleteSubtree] Deleted message subtree', {
+      user: userId,
+      conversationId,
+      messageId,
+      deletedCount: result.deletedCount,
+      remainingCount: result.remainingCount,
+    });
     const conversationDeleted = result.remainingCount === 0;
 
     if (conversationDeleted) {

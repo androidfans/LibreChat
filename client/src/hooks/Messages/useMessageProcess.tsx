@@ -20,6 +20,8 @@ export default function useMessageProcess({ message }: { message?: TMessage | nu
       return;
     }
     if (!hasNoChildren) {
+      // This message may become the leaf again without its text changing.
+      latestText.current = '';
       return;
     }
 

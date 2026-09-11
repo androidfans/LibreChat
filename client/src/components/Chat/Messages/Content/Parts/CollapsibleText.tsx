@@ -5,6 +5,7 @@ import Markdown from '~/components/Chat/Messages/Content/Markdown';
 import { useMessageContext } from '~/Providers';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
+import { traceMessage } from '~/utils/messageTrace';
 
 // 基于渲染高度来判断，假设每行约20px
 const MAX_HEIGHT_PX = 400; // 约20行，每行20px
@@ -67,6 +68,13 @@ const CollapsibleText = memo(
     const [isSelecting, setIsSelecting] = useState(false);
     const [contentElement, setContentElement] = useState<HTMLDivElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+      const expansion = isExpanded ? 'expanded' : 'collapsed';
+      traceMessage('view.collapse', {
+        messageId,
+        reason: shouldCollapse ? expansion : 'not-collapsible',
+      });
+    }, [messageId, shouldCollapse, isExpanded]);
 
     // 检测内容高度来判断是否需要折叠
     useEffect(() => {

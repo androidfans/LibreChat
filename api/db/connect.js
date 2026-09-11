@@ -3,6 +3,7 @@ const { isEnabled } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 
 const mongoose = require('mongoose');
+const messageTrace = require('../server/utils/messageTrace');
 const MONGO_URI = process.env.MONGO_URI;
 
 if (!MONGO_URI) {
@@ -49,6 +50,7 @@ async function connectDb() {
   if (!cached.promise || disconnected) {
     const opts = {
       bufferCommands: false,
+      ...(messageTrace.enabled() ? { monitorCommands: true } : {}),
       ...(maxPoolSize ? { maxPoolSize } : {}),
       ...(minPoolSize ? { minPoolSize } : {}),
       ...(maxConnecting ? { maxConnecting } : {}),
@@ -66,6 +68,8 @@ async function connectDb() {
     logger.info(JSON.stringify(opts, null, 2));
     mongoose.set('strictQuery', true);
     cached.promise = mongoose.connect(MONGO_URI, opts).then((mongoose) => {
+      messageTrace.monitorMongo(mongoose.connection.getClient());
+      messageTrace.monitorTopology(mongoose.connection.db);
       return mongoose;
     });
   }

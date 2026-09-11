@@ -4,6 +4,7 @@ import type { UseQueryOptions, QueryObserverResult } from '@tanstack/react-query
 import { QueryKeys, dataService } from 'librechat-data-provider';
 import type * as t from 'librechat-data-provider';
 import { logger } from '~/utils';
+import { traceMessageGraph } from '~/utils/messageTrace';
 
 type StableMessagesParams = {
   pathname: string;
@@ -55,6 +56,11 @@ export const useGetMessagesByConvoId = <TData = t.TMessage[]>(
         pathname: location.pathname,
         result,
         currentMessages,
+      });
+      traceMessageGraph('query.result', result, {
+        conversationId: id,
+        previousCount: currentMessages?.length ?? 0,
+        preservedCache: stableMessages === currentMessages,
       });
 
       if (stableMessages === currentMessages) {

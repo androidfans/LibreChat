@@ -40,6 +40,8 @@ export default function useMessageHelpers(props: TMessageProps) {
       return;
     }
     if (!isLast) {
+      // This message may become the leaf again without its text changing.
+      latestText.current = '';
       return;
     }
 

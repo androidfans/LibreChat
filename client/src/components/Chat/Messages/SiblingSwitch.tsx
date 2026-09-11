@@ -2,6 +2,7 @@ import { useRef, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { TMessageProps } from '~/common';
 import { cn } from '~/utils';
+import { messageTraceEnabled, traceMessageViewport } from '~/utils/messageTrace';
 
 type TSiblingSwitchProps = Pick<TMessageProps, 'siblingIdx' | 'siblingCount' | 'setSiblingIdx'> & {
   /**
@@ -29,7 +30,8 @@ function findScrollContainer(element: Element): HTMLElement | null {
   while (current) {
     const style = window.getComputedStyle(current);
     const overflowY = style.overflowY;
-    const isScrollableOverflow = overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
+    const isScrollableOverflow =
+      overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay';
     if (isScrollableOverflow && current.scrollHeight > current.clientHeight) {
       return current;
     }
@@ -79,23 +81,26 @@ export default function SiblingSwitch({
     }
   }, []);
 
-  const keepVisible = useCallback((messageContainer: Element) => {
-    if (typeof ResizeObserver !== 'function') {
-      return;
-    }
-
-    const observer = new ResizeObserver(() => {
-      if (!(messageContainer instanceof HTMLElement) || !messageContainer.isConnected) {
-        observer.disconnect();
+  const keepVisible = useCallback(
+    (messageContainer: Element) => {
+      if (typeof ResizeObserver !== 'function') {
         return;
       }
 
-      ensureVisible(messageContainer, 'instant');
-    });
+      const observer = new ResizeObserver(() => {
+        if (!(messageContainer instanceof HTMLElement) || !messageContainer.isConnected) {
+          observer.disconnect();
+          return;
+        }
 
-    observer.observe(messageContainer);
-    setTimeout(() => observer.disconnect(), KEEP_VISIBLE_TIMEOUT_MS);
-  }, [ensureVisible]);
+        ensureVisible(messageContainer, 'instant');
+      });
+
+      observer.observe(messageContainer);
+      setTimeout(() => observer.disconnect(), KEEP_VISIBLE_TIMEOUT_MS);
+    },
+    [ensureVisible],
+  );
 
   const scrollToMessage = useCallback(
     (attempt = 0) => {
@@ -125,13 +130,17 @@ export default function SiblingSwitch({
   );
 
   const scheduleScrollToMessage = useCallback(() => {
+    if (messageTraceEnabled) {
+      setTimeout(() => traceMessageViewport(scrollKey, 'after-switch'), 150);
+      setTimeout(() => traceMessageViewport(scrollKey, 'after-layout-settled'), 1500);
+    }
     if (typeof requestAnimationFrame === 'function') {
       requestAnimationFrame(() => scrollToMessage());
       return;
     }
 
     setTimeout(() => scrollToMessage(), 0);
-  }, [scrollToMessage]);
+  }, [scrollToMessage, scrollKey]);
 
   if (siblingIdx === undefined) {
     return null;

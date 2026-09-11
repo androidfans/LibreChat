@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const fetch = require('node-fetch');
 const { logger } = require('@librechat/data-schemas');
+const messageTrace = require('~/server/utils/messageTrace');
 const {
   countTokens,
   getBalanceConfig,
@@ -435,6 +436,22 @@ class BaseClient {
     const prunedMemory = messages;
     remainingContextTokens -= currentTokenCount;
 
+    if (messageTrace.enabled()) {
+      const details = {
+        conversationId: this.conversationId,
+        parentMessageId: this.parentMessageId,
+        maxContextTokens: maxContextTokens ?? this.maxContextTokens,
+        instructionsTokenCount,
+        promptTokens: currentTokenCount + instructionsTokenCount,
+        remainingContextTokens,
+        inputCount: _messages.length,
+        keptCount: context.length,
+        droppedCount: prunedMemory.length,
+      };
+      messageTrace.traceMessages('context.kept', [...context].reverse(), details);
+      messageTrace.traceMessages('context.dropped', prunedMemory, details);
+    }
+
     return {
       context: context.reverse(),
       remainingContextTokens,
@@ -448,6 +465,14 @@ class BaseClient {
     formattedMessages,
     buildTokenMap = true,
   }) {
+    messageTrace.trace('context.budget', {
+      conversationId: this.conversationId,
+      parentMessageId: this.parentMessageId,
+      model: typeof this.model === 'string' ? this.model.slice(0, 160) : undefined,
+      maxContextTokens: this.maxContextTokens,
+      strategy: this.contextStrategy,
+      inputCount: orderedMessages.length,
+    });
     let _instructions;
     let tokenCount;
 
@@ -457,6 +482,12 @@ class BaseClient {
 
     _instructions && logger.debug('[BaseClient] instructions tokenCount: ' + tokenCount);
     if (tokenCount && tokenCount > this.maxContextTokens) {
+      messageTrace.trace('context.rejected', {
+        conversationId: this.conversationId,
+        reason: 'instructions',
+        tokenCount,
+        maxContextTokens: this.maxContextTokens,
+      });
       const info = `${tokenCount} / ${this.maxContextTokens}`;
       const errorMessage = `{ "type": "${ErrorTypes.INPUT_LENGTH}", "info": "${info}" }`;
       logger.warn(`Instructions token count exceeds max token count (${info}).`);
@@ -471,6 +502,11 @@ class BaseClient {
       );
 
       if (editedIndices.length > 0) {
+        messageTrace.traceMessages(
+          'context.toolsTruncated',
+          editedIndices.map((index) => orderedMessages[index]),
+          { conversationId: this.conversationId, maxContextTokens: this.maxContextTokens },
+        );
         logger.debug('[BaseClient] Truncated tool call outputs:', editedIndices);
         for (const index of editedIndices) {
           formattedMessages[index].content = dbMessages[index].content;
@@ -519,6 +555,13 @@ class BaseClient {
 
     const latestMessage = orderedWithInstructions[orderedWithInstructions.length - 1];
     if (payload.length === 0 && !shouldSummarize && latestMessage) {
+      messageTrace.trace('context.rejected', {
+        conversationId: this.conversationId,
+        reason: 'latest-message',
+        messageId: latestMessage.messageId,
+        tokenCount: latestMessage.tokenCount,
+        maxContextTokens: this.maxContextTokens,
+      });
       const info = `${latestMessage.tokenCount} / ${this.maxContextTokens}`;
       const errorMessage = `{ "type": "${ErrorTypes.INPUT_LENGTH}", "info": "${info}" }`;
       logger.warn(`Prompt token count exceeds max token count (${info}).`);
@@ -528,6 +571,12 @@ class BaseClient {
       payload.length === 1 &&
       payload[0].content === _instructions.content
     ) {
+      messageTrace.trace('context.rejected', {
+        conversationId: this.conversationId,
+        reason: 'instructions-and-prompt',
+        tokenCount: tokenCount + 3,
+        maxContextTokens: this.maxContextTokens,
+      });
       const info = `${tokenCount + 3} / ${this.maxContextTokens}`;
       const errorMessage = `{ "type": "${ErrorTypes.INPUT_LENGTH}", "info": "${info}" }`;
       logger.warn(
@@ -578,6 +627,17 @@ class BaseClient {
     }
 
     const promptTokens = this.maxContextTokens - remainingContextTokens;
+    messageTrace.trace('context.payload', {
+      conversationId: this.conversationId,
+      parentMessageId: this.parentMessageId,
+      promptTokens,
+      maxContextTokens: this.maxContextTokens,
+      remainingContextTokens,
+      payloadSize: payload.length,
+      summarized: shouldSummarize,
+      reusedSummary: Boolean(usePrevSummary),
+      summaryTokenCount,
+    });
 
     logger.debug('[BaseClient] tokenCountMap:', tokenCountMap);
     logger.debug('[BaseClient]', {
@@ -882,6 +942,7 @@ class BaseClient {
 
   async loadHistory(conversationId, parentMessageId = null) {
     logger.debug('[BaseClient] Loading history:', { conversationId, parentMessageId });
+    messageTrace.trace('history.load', { conversationId, parentMessageId });
 
     const messages = (await getMessages({ conversationId })) ?? [];
 
@@ -898,6 +959,13 @@ class BaseClient {
       messages,
       parentMessageId,
       mapMethod,
+    });
+    messageTrace.trace('history.loaded', {
+      conversationId,
+      parentMessageId,
+      storedCount: messages.length,
+      historyCount: _messages.length,
+      historyIds: _messages.map((message) => message.messageId ?? message.id).slice(0, 300),
     });
 
     _messages = await this.addPreviousAttachments(_messages);
@@ -1045,6 +1113,10 @@ class BaseClient {
 
     while (currentMessageId) {
       if (visitedMessageIds.has(currentMessageId)) {
+        messageTrace.trace('history.cycle', {
+          parentMessageId,
+          messageId: currentMessageId,
+        });
         break;
       }
       const message = messages.find((msg) => {
@@ -1055,6 +1127,11 @@ class BaseClient {
       visitedMessageIds.add(currentMessageId);
 
       if (!message) {
+        messageTrace.trace('history.missingParent', {
+          parentMessageId,
+          messageId: currentMessageId,
+          visitedIds: [...visitedMessageIds].slice(0, 300),
+        });
         break;
       }
 
