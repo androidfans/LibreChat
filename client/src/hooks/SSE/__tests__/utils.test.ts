@@ -18,6 +18,76 @@ const message = (overrides: Partial<TMessage>): TMessage =>
   }) as TMessage;
 
 describe('upsertResponseMessage', () => {
+  it('preserves all eight messages when an older final arrives during regeneration', () => {
+    const root = message({ messageId: 'root' });
+    const context = message({ messageId: 'context', parentMessageId: 'root' });
+    const question = message({ messageId: 'question', parentMessageId: 'context' });
+    const originalReply = message({
+      messageId: 'original-reply',
+      parentMessageId: 'question',
+      isCreatedByUser: false,
+    });
+    const previousReply = message({
+      messageId: 'previous-reply',
+      parentMessageId: 'question',
+      isCreatedByUser: false,
+    });
+    const followUp = message({ messageId: 'follow-up', parentMessageId: 'previous-reply' });
+    const followUpReply = message({
+      messageId: 'follow-up-reply',
+      parentMessageId: 'follow-up',
+      isCreatedByUser: false,
+    });
+    const regeneratingReply = message({
+      messageId: 'regenerating-reply',
+      parentMessageId: 'question',
+      isCreatedByUser: false,
+    });
+    const messages = [
+      root,
+      context,
+      question,
+      originalReply,
+      previousReply,
+      followUp,
+      followUpReply,
+      regeneratingReply,
+    ];
+
+    // finalHandler combines the active regeneration with the older event's requestMessage.
+    const result = upsertResponseMessage({
+      messages,
+      response: { ...followUpReply, text: 'older generation completed' },
+      userMessage: followUp,
+      submission: {
+        isRegenerate: true,
+        userMessage: followUp,
+        initialResponse: { messageId: 'follow-up-reply_', parentMessageId: question.messageId },
+      },
+    });
+
+    expect(result).toHaveLength(8);
+    expect(result.filter((entry) => entry.isCreatedByUser)).toEqual([
+      root,
+      context,
+      question,
+      followUp,
+    ]);
+    expect(new Map(result.map((entry) => [entry.messageId, entry.parentMessageId]))).toEqual(
+      new Map(messages.map((entry) => [entry.messageId, entry.parentMessageId])),
+    );
+    const ids = new Set(result.map((entry) => entry.messageId));
+    const orphans = result.filter(
+      (entry) =>
+        entry.parentMessageId !== '00000000-0000-0000-0000-000000000000' &&
+        !ids.has(entry.parentMessageId!),
+    );
+    expect(orphans).toEqual([]);
+    expect(result.find((entry) => entry.messageId === followUpReply.messageId)?.text).toBe(
+      'older generation completed',
+    );
+  });
+
   it('replaces temporary response aliases with the final response', () => {
     const userMessage = message({ messageId: 'user-real', isCreatedByUser: true });
     const finalResponse = message({

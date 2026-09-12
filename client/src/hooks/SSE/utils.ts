@@ -1,6 +1,7 @@
 import type { TMessage } from 'librechat-data-provider';
 
 type ResponseAliasSubmission = {
+  isRegenerate?: boolean;
   userMessage?: Pick<TMessage, 'messageId' | 'responseMessageId'> | null;
   initialResponse?: Partial<Pick<TMessage, 'messageId' | 'parentMessageId'>> | null;
 };
@@ -50,7 +51,12 @@ export const upsertResponseMessage = ({
   let updatedMessages = messages.filter(
     (message) =>
       !aliasIds.has(message.messageId) &&
-      !(message.isCreatedByUser === true && userAliasIds.has(message.messageId)),
+      // Regeneration reuses an existing question; it does not add an optimistic user message.
+      !(
+        !submission.isRegenerate &&
+        message.isCreatedByUser === true &&
+        userAliasIds.has(message.messageId)
+      ),
   );
 
   if (!updatedMessages.some((message) => message.messageId === userMessage.messageId)) {
