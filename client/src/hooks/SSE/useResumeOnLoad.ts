@@ -121,7 +121,11 @@ export default function useResumeOnLoad(
     conversationId !== Constants.NEW_CONVO &&
     processedConvoRef.current !== conversationId; // Don't re-check processed convos
 
-  const { data: streamStatus, isSuccess } = useStreamStatus(conversationId, shouldCheck);
+  const {
+    data: streamStatus,
+    isSuccess,
+    isFetching,
+  } = useStreamStatus(conversationId, shouldCheck);
 
   useEffect(() => {
     console.log('[ResumeOnLoad] Effect check', {
@@ -167,8 +171,8 @@ export default function useResumeOnLoad(
       );
     }
 
-    // Wait for stream status query to complete
-    if (!isSuccess || !streamStatus) {
+    // Cached success may belong to a previous generation while the current status is fetching.
+    if (!isSuccess || isFetching || !streamStatus) {
       console.log('[ResumeOnLoad] Waiting for stream status query');
       return;
     }
@@ -237,6 +241,7 @@ export default function useResumeOnLoad(
     submissionConvoId,
     currentSubmission,
     isSuccess,
+    isFetching,
     streamStatus,
     getMessages,
     setSubmission,
