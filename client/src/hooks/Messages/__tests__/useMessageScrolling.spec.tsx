@@ -76,6 +76,14 @@ describe('getScrollPosition', () => {
     });
   });
 
+  it('excludes reserved trailing space when deciding whether content overflows', () => {
+    expect(getScrollPosition({ scrollTop: 0, scrollHeight: 480, clientHeight: 400 }, 400)).toEqual({
+      canScroll: false,
+      isAtTop: true,
+      isAtBottom: true,
+    });
+  });
+
   it.each([
     [0, true, false],
     [300, false, false],
@@ -94,6 +102,7 @@ describe('useMessageScrolling', () => {
   let scrollTop = 0;
   let scrollHeight = 1000;
   let clientHeight = 400;
+  let messageContentHeight = 920;
   let originalResizeObserver: typeof ResizeObserver;
   let originalRequestAnimationFrame: typeof window.requestAnimationFrame;
   let originalCancelAnimationFrame: typeof window.cancelAnimationFrame;
@@ -104,6 +113,7 @@ describe('useMessageScrolling', () => {
     scrollTop = 0;
     scrollHeight = 1000;
     clientHeight = 400;
+    messageContentHeight = 920;
     nextAnimationFrame = undefined;
     resizeObserverCallback = undefined;
 
@@ -149,6 +159,10 @@ describe('useMessageScrolling', () => {
         }),
       },
     });
+    Object.defineProperty(content, 'scrollHeight', {
+      configurable: true,
+      get: () => messageContentHeight,
+    });
 
     act(() => {
       resizeObserverCallback?.([], {} as ResizeObserver);
@@ -186,6 +200,7 @@ describe('useMessageScrolling', () => {
   it('hides navigation when the conversation does not overflow', () => {
     scrollHeight = 400;
     clientHeight = 400;
+    messageContentHeight = 320;
     renderHarness();
 
     expect(hookValue.showScrollNavigation).toBe(false);
@@ -260,6 +275,26 @@ describe('useMessageScrolling', () => {
       jest.useRealTimers();
     },
   );
+
+  it('does not run a queued next action after boundary navigation', () => {
+    jest.useFakeTimers();
+    const { container, unmount } = renderHarness();
+    const event = {
+      preventDefault: jest.fn(),
+    } as unknown as React.MouseEvent<HTMLButtonElement>;
+
+    act(() => {
+      hookValue.handleScrollToNext(event);
+      hookValue.handleScrollToNext(event);
+      hookValue.handleScrollToTop(event);
+      jest.advanceTimersByTime(800);
+    });
+
+    expect(container.scrollTo).toHaveBeenCalledTimes(2);
+    expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 0, behavior: 'smooth' });
+    unmount();
+    jest.useRealTimers();
+  });
 
   it('disconnects the resize observer on unmount', () => {
     const { unmount } = renderHarness();

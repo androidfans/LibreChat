@@ -53,34 +53,36 @@ function MessagesViewContent({
               width: '100%',
             }}
           >
-            <div ref={messagesContentRef} className="flex flex-col pb-20 dark:bg-transparent">
-              {(_messagesTree && _messagesTree.length == 0) || _messagesTree === null ? (
-                <div
-                  className={cn(
-                    'flex w-full items-center justify-center p-3 text-text-secondary',
-                    fontSize,
-                  )}
-                >
-                  {localize('com_ui_nothing_found')}
-                </div>
-              ) : (
-                <>
-                  <div ref={screenshotTargetRef}>
-                    <MultiMessage
-                      key={conversationId}
-                      messagesTree={_messagesTree}
-                      messageId={conversationId ?? null}
-                      setCurrentEditId={setCurrentEditId}
-                      currentEditId={currentEditId ?? null}
-                    />
+            <div className="flex flex-col pb-20 dark:bg-transparent">
+              <div ref={messagesContentRef} className="flex flex-col">
+                {(_messagesTree && _messagesTree.length == 0) || _messagesTree === null ? (
+                  <div
+                    className={cn(
+                      'flex w-full items-center justify-center p-3 text-text-secondary',
+                      fontSize,
+                    )}
+                  >
+                    {localize('com_ui_nothing_found')}
                   </div>
-                </>
-              )}
-              <div
-                id="messages-end"
-                className="group h-0 w-full flex-shrink-0"
-                ref={messagesEndRef}
-              />
+                ) : (
+                  <>
+                    <div ref={screenshotTargetRef}>
+                      <MultiMessage
+                        key={conversationId}
+                        messagesTree={_messagesTree}
+                        messageId={conversationId ?? null}
+                        setCurrentEditId={setCurrentEditId}
+                        currentEditId={currentEditId ?? null}
+                      />
+                    </div>
+                  </>
+                )}
+                <div
+                  id="messages-end"
+                  className="group h-0 w-full flex-shrink-0"
+                  ref={messagesEndRef}
+                />
+              </div>
             </div>
           </div>
 

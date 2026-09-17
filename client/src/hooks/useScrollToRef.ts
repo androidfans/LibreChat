@@ -88,7 +88,7 @@ export default function useScrollToRef({
           scrollCurrentMessageToTop(reduceMotion ? 'auto' : 'smooth', smoothCallback);
         },
         750,
-        { leading: true },
+        { leading: true, trailing: false },
       ),
     [scrollCurrentMessageToTop, smoothCallback],
   );

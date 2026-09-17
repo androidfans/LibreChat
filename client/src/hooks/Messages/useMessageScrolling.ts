@@ -14,13 +14,16 @@ type ScrollPosition = {
   isAtBottom: boolean;
 };
 
-export function getScrollPosition({
-  scrollTop,
-  scrollHeight,
-  clientHeight,
-}: Pick<HTMLDivElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>): ScrollPosition {
+export function getScrollPosition(
+  {
+    scrollTop,
+    scrollHeight,
+    clientHeight,
+  }: Pick<HTMLDivElement, 'scrollTop' | 'scrollHeight' | 'clientHeight'>,
+  contentHeight = scrollHeight,
+): ScrollPosition {
   const maxScrollTop = Math.max(0, scrollHeight - clientHeight);
-  const canScroll = maxScrollTop > SCROLL_EDGE_EPSILON;
+  const canScroll = contentHeight - clientHeight > SCROLL_EDGE_EPSILON;
 
   return {
     canScroll,
@@ -58,7 +61,7 @@ export default function useMessageScrolling(messagesTree?: TMessage[] | null) {
       return;
     }
 
-    const nextPosition = getScrollPosition(container);
+    const nextPosition = getScrollPosition(container, messagesContentRef.current?.scrollHeight);
     setScrollPosition((currentPosition) => {
       if (
         currentPosition.canScroll === nextPosition.canScroll &&
