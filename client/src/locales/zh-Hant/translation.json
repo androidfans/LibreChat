@@ -482,7 +482,7 @@
   "com_nav_profile_picture": "個人頭像",
   "com_nav_save_badges_state": "儲存徽章狀態",
   "com_nav_save_drafts": "儲存本機草稿",
-  "com_nav_scroll_button": "滾動至底部按鈕",
+  "com_nav_scroll_button": "對話導覽按鈕",
   "com_nav_search_placeholder": "搜尋訊息",
   "com_nav_send_message": "傳送訊息",
   "com_nav_setting_account": "帳號",
@@ -894,5 +894,9 @@
   "com_ui_weekend_morning": "週末愉快",
   "com_ui_yes": "是",
   "com_ui_zoom": "縮放",
-  "com_user_message": "您"
+  "com_user_message": "您",
+  "com_ui_conversation_navigation": "對話導覽",
+  "com_ui_scroll_to_bottom": "捲動到底部",
+  "com_ui_scroll_to_next_message": "捲動到下一則訊息",
+  "com_ui_scroll_to_top": "捲動到頂部"
 }
