@@ -1,4 +1,4 @@
-import { RefObject, useCallback } from 'react';
+import { RefObject, useCallback, useEffect, useMemo } from 'react';
 import throttle from 'lodash/throttle';
 
 type TUseScrollToRef = {
@@ -24,69 +24,91 @@ export default function useScrollToRef({
   smoothCallback,
   scrollableRef,
 }: TUseScrollToRef): ScrollToRefReturn {
-  const logAndScroll = (behavior: 'instant' | 'smooth', callbackFn: () => void) => {
-    // Debugging:
-    // console.log(`Scrolling with behavior: ${behavior}, Time: ${new Date().toISOString()}`);
-    targetRef.current?.scrollIntoView({ behavior });
-    callbackFn();
-  };
-
-  const scrollCurrentMessageToTop = (behavior: 'instant' | 'smooth', callbackFn: () => void) => {
-    if (!scrollableRef?.current) {
-      // fallback to scrollIntoView
+  const logAndScroll = useCallback(
+    (behavior: ScrollBehavior, callbackFn: () => void) => {
       targetRef.current?.scrollIntoView({ behavior });
       callbackFn();
-      return;
-    }
-
-    const container = scrollableRef.current;
-    const containerRect = container.getBoundingClientRect();
-    const containerBottom = containerRect.bottom;
-    // Offset to show a bit of the next message and avoid covering UI elements
-    const offset = 80;
-
-    // Find all message elements in the container
-    const messages = container.querySelectorAll('.message-render');
-    let targetMessage: Element | null = null;
-
-    // Find the message whose bottom is below the visible area
-    for (const message of messages) {
-      const messageRect = message.getBoundingClientRect();
-      if (messageRect.bottom > containerBottom) {
-        targetMessage = message;
-        break;
-      }
-    }
-
-    if (targetMessage) {
-      const messageRect = targetMessage.getBoundingClientRect();
-      // Scroll so message bottom aligns with container bottom, plus offset to reveal next message
-      const scrollAmount = messageRect.bottom - containerBottom + offset;
-      container.scrollTo({
-        top: container.scrollTop + scrollAmount,
-        behavior,
-      });
-    }
-
-    callbackFn();
-  };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const scrollToRef = useCallback(
-    throttle(() => logAndScroll('instant', callback), 145, { leading: true }),
+    },
     [targetRef],
   );
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const scrollToRefSmooth = useCallback(
-    throttle(() => scrollCurrentMessageToTop('smooth', smoothCallback), 750, { leading: true }),
-    [targetRef, scrollableRef],
+  const scrollCurrentMessageToTop = useCallback(
+    (behavior: ScrollBehavior, callbackFn: () => void) => {
+      if (!scrollableRef?.current) {
+        targetRef.current?.scrollIntoView({ behavior });
+        callbackFn();
+        return;
+      }
+
+      const container = scrollableRef.current;
+      const containerRect = container.getBoundingClientRect();
+      const containerBottom = containerRect.bottom;
+      const offset = 80;
+
+      const messages = container.querySelectorAll('.message-render');
+      let targetMessage: Element | null = null;
+
+      for (const message of messages) {
+        const messageRect = message.getBoundingClientRect();
+        if (messageRect.bottom > containerBottom) {
+          targetMessage = message;
+          break;
+        }
+      }
+
+      if (targetMessage) {
+        const messageRect = targetMessage.getBoundingClientRect();
+        const scrollAmount = messageRect.bottom - containerBottom + offset;
+        container.scrollTo({
+          top: container.scrollTop + scrollAmount,
+          behavior,
+        });
+      } else {
+        container.scrollTo({ top: container.scrollHeight, behavior });
+      }
+
+      callbackFn();
+    },
+    [scrollableRef, targetRef],
   );
 
-  const handleSmoothToRef: React.MouseEventHandler<HTMLButtonElement> = (e) => {
-    e.preventDefault();
-    scrollToRefSmooth();
-  };
+  const scrollToRef = useMemo(
+    () => throttle(() => logAndScroll('auto', callback), 145, { leading: true }),
+    [callback, logAndScroll],
+  );
+
+  const scrollToRefSmooth = useMemo(
+    () =>
+      throttle(
+        () => {
+          const reduceMotion =
+            typeof window !== 'undefined' &&
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          scrollCurrentMessageToTop(reduceMotion ? 'auto' : 'smooth', smoothCallback);
+        },
+        750,
+        { leading: true, trailing: false },
+      ),
+    [scrollCurrentMessageToTop, smoothCallback],
+  );
+
+  useEffect(
+    () => () => {
+      scrollToRef.cancel();
+      scrollToRefSmooth.cancel();
+    },
+    [scrollToRef, scrollToRefSmooth],
+  );
+
+  const handleSmoothToRef: React.MouseEventHandler<HTMLButtonElement> = useCallback(
+    (event) => {
+      event.preventDefault();
+      scrollToRef.cancel();
+      scrollToRefSmooth();
+    },
+    [scrollToRef, scrollToRefSmooth],
+  );
 
   return {
     scrollToRef,
