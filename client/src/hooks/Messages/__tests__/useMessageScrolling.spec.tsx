@@ -125,8 +125,8 @@ describe('useMessageScrolling', () => {
     HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
   });
 
-  function renderHarness() {
-    const result = render(<Harness messages={messages} />);
+  function renderHarness(initialMessages = messages) {
+    const result = render(<Harness messages={initialMessages} />);
     const container = result.getByTestId('scroll-container');
     const content = result.getByTestId('message-content');
 
@@ -210,6 +210,7 @@ describe('useMessageScrolling', () => {
     act(() => {
       hookValue.handleScrollToNext(event);
     });
+    expect(container.scrollTo).toHaveBeenLastCalledWith({ top: 1000, behavior: 'smooth' });
     expect(mockSetAbortScroll).toHaveBeenLastCalledWith(true);
 
     act(() => {
@@ -231,6 +232,34 @@ describe('useMessageScrolling', () => {
 
     expect(container.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'auto' });
   });
+
+  it.each(['top', 'next'] as const)(
+    'cancels queued streaming auto-scroll before navigating to %s',
+    (destination) => {
+      jest.useFakeTimers();
+      mockIsSubmitting = true;
+      const { rerender, unmount } = renderHarness();
+      const scrollIntoView = HTMLElement.prototype.scrollIntoView as jest.Mock;
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+
+      rerender(<Harness messages={[...messages, { messageId: 'message-2' } as TMessage]} />);
+      act(() => {
+        const event = {
+          preventDefault: jest.fn(),
+        } as unknown as React.MouseEvent<HTMLButtonElement>;
+        if (destination === 'top') {
+          hookValue.handleScrollToTop(event);
+        } else {
+          hookValue.handleScrollToNext(event);
+        }
+        jest.advanceTimersByTime(200);
+      });
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      unmount();
+      jest.useRealTimers();
+    },
+  );
 
   it('disconnects the resize observer on unmount', () => {
     const { unmount } = renderHarness();

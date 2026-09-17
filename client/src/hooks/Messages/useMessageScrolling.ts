@@ -123,13 +123,14 @@ export default function useMessageScrolling(messagesTree?: TMessage[] | null) {
   const handleScrollToTop: React.MouseEventHandler<HTMLButtonElement> = useCallback(
     (event) => {
       event.preventDefault();
+      scrollToBottom?.cancel();
       if (isSubmitting) {
         setAbortScroll(true);
       }
       scrollableRef.current?.scrollTo({ top: 0, behavior: getSmoothScrollBehavior() });
       handleScroll();
     },
-    [handleScroll, isSubmitting, setAbortScroll],
+    [handleScroll, isSubmitting, scrollToBottom, setAbortScroll],
   );
 
   const handleScrollToBottom: React.MouseEventHandler<HTMLButtonElement> = useCallback(
@@ -152,15 +153,14 @@ export default function useMessageScrolling(messagesTree?: TMessage[] | null) {
       return;
     }
 
-    if (isSubmitting && scrollToBottom && abortScroll !== true) {
-      scrollToBottom();
+    if (abortScroll === true) {
+      scrollToBottom?.cancel();
+      return;
     }
 
-    return () => {
-      if (abortScroll === true) {
-        scrollToBottom && scrollToBottom.cancel();
-      }
-    };
+    if (isSubmitting && scrollToBottom) {
+      scrollToBottom();
+    }
   }, [isSubmitting, messagesTree, scrollToBottom, abortScroll]);
 
   useEffect(() => {

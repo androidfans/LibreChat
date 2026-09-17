@@ -63,6 +63,8 @@ export default function useScrollToRef({
           top: container.scrollTop + scrollAmount,
           behavior,
         });
+      } else {
+        container.scrollTo({ top: container.scrollHeight, behavior });
       }
 
       callbackFn();
@@ -102,9 +104,10 @@ export default function useScrollToRef({
   const handleSmoothToRef: React.MouseEventHandler<HTMLButtonElement> = useCallback(
     (event) => {
       event.preventDefault();
+      scrollToRef.cancel();
       scrollToRefSmooth();
     },
-    [scrollToRefSmooth],
+    [scrollToRef, scrollToRefSmooth],
   );
 
   return {
