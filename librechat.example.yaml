@@ -38,19 +38,22 @@ endpoints:
         timeout: 600000 # 10 minutes
       models:
         default: [
-          "gemini-2.5-pro",
-          "gemini-3.1-pro-preview",
-          "gpt-4.1",
-          "gpt-5.2",
-          "gpt-5.5",
-          "claude-sonnet-4.5",
-          "claude-sonnet-4.6",
-          "claude-opus-4.5",
-          "claude-opus-4.6",
-          "claude-opus-4.7",
-          "gemini-3-flash-preview",
+          "hy4-preview",
+          "k3-256k",
+          "k3",
+          "gpt-5.6-sol",
+          "gpt-6-astra",
+          "deepseek-flash",
+          "deepseek-pro",
+          "gemini-4-argon",
+          "gemini-3.8-flash",
+          "gemini-3.5-flash",
+          "glm-5.2"
         ]
-        fetch: true
+        # 必须保持 false：动态抓取会用远端 /models 完全覆盖 default。
+        # 若新模型可调用但尚未出现在 /models（或浏览器仍缓存旧列表），LibreChat 会
+        # 将 modelSpecs 中的目标模型回退成其他模型，造成“界面显示 4 Argon、实际请求 3.8”。
+        fetch: false
       titleConvo: true
       titleModel: "gpt-4.1"
       summarize: true
@@ -70,112 +73,112 @@ modelSpecs:
     - OpenRouter
     - copilot
   list:
-    - name: "copilot-gemini-2.5-pro"
-      label: "Copilot Gemini 2.5 Pro"
+    - name: "copilot-hy4-preview"
+      label: "Copilot HY4 Preview"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "gemini-2.5-pro"
-        modelLabel: "Copilot Gemini 2.5 Pro" # 这个是模型回消息的时候头像旁边显示的名字
+        model: "hy4-preview"
+        modelLabel: "Copilot HY4 Preview" # 这个是模型回消息的时候头像旁边显示的名字
         maxContextTokens: 99999999
 
-    - name: "copilot-gemini-3.1-pro-preview"
-      label: "Copilot Gemini 3.1 Pro"
+    - name: "copilot-k3-256k"
+      label: "Copilot K3 256K"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "gemini-3.1-pro-preview"
-        modelLabel: "Copilot Gemini 3.1 Pro"
+        model: "k3-256k"
+        modelLabel: "Copilot K3 256K"
         maxContextTokens: 99999999
 
-    - name: "copilot-gemini-3-flash-preview"
-      label: "Copilot Gemini 3 Flash"
+    - name: "copilot-k3"
+      label: "Copilot K3"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "gemini-3-flash-preview"
-        modelLabel: "Copilot Gemini 3 Flash"
+        model: "k3"
+        modelLabel: "Copilot K3"
         maxContextTokens: 99999999
 
-    - name: "copilot-claude-sonnet-4.5"
-      label: "Copilot Claude Sonnet 4.5"
+    - name: "copilot-gpt-5.6-sol"
+      label: "Copilot GPT 5.6 Sol"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "claude-sonnet-4.5"
-        modelLabel: "Copilot Claude Sonnet 4.5"
+        model: "gpt-5.6-sol"
+        modelLabel: "Copilot GPT 5.6 Sol"
         maxContextTokens: 99999999
 
-    - name: "copilot-claude-opus-4.5"
-      label: "Copilot Claude Opus 4.5"
+    - name: "copilot-gpt-6-astra"
+      label: "Copilot GPT 6 Astra"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "claude-opus-4.5"
-        modelLabel: "Copilot Claude Opus 4.5"
+        model: "gpt-6-astra"
+        modelLabel: "Copilot GPT 6 Astra"
         maxContextTokens: 99999999
 
-    - name: "copilot-claude-sonnet-4.6"
-      label: "Copilot Claude Sonnet 4.6"
+    - name: "copilot-deepseek-flash"
+      label: "Copilot DeepSeek Flash"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "claude-sonnet-4.6"
-        modelLabel: "Copilot Claude Sonnet 4.6"
+        model: "deepseek-flash"
+        modelLabel: "Copilot DeepSeek Flash"
         maxContextTokens: 99999999
 
-    - name: "copilot-claude-opus-4.6"
-      label: "Copilot Claude Opus 4.6"
+    - name: "copilot-deepseek-pro"
+      label: "Copilot DeepSeek Pro"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "claude-opus-4.6"
-        modelLabel: "Copilot Claude Opus 4.6"
+        model: "deepseek-pro"
+        modelLabel: "Copilot DeepSeek Pro"
         maxContextTokens: 99999999
 
-    - name: "copilot-claude-opus-4.7"
-      label: "Copilot Claude Opus 4.7"
+    - name: "copilot-gemini-4-argon"
+      label: "Copilot Gemini 4 Argon"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "claude-opus-4.7"
-        modelLabel: "Copilot Claude Opus 4.7"
+        model: "gemini-4-argon"
+        modelLabel: "Copilot Gemini 4 Argon"
         maxContextTokens: 99999999
 
-    - name: "copilot-gpt-4.1"
-      label: "Copilot GPT 4.1"
+    - name: "copilot-gemini-3.8-flash"
+      label: "Copilot Gemini 3.8 Flash"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "gpt-4.1"
-        modelLabel: "Copilot GPT 4.1"
+        model: "gemini-3.8-flash"
+        modelLabel: "Copilot Gemini 3.8 Flash"
         maxContextTokens: 99999999
 
-    - name: "copilot-gpt-5.2"
-      label: "Copilot GPT 5.2"
+    - name: "copilot-gemini-3.5-flash"
+      label: "Copilot Gemini 3.5 Flash"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "gpt-5.2"
-        modelLabel: "Copilot GPT 5.2"
+        model: "gemini-3.5-flash"
+        modelLabel: "Copilot Gemini 3.5 Flash"
         maxContextTokens: 99999999
 
-    - name: "copilot-gpt-5.5"
-      label: "Copilot GPT 5.5"
+    - name: "copilot-glm-5.2"
+      label: "Copilot GLM 5.2"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
       description: ""
       preset:
         endpoint: "copilot"
-        model: "gpt-5.5"
-        modelLabel: "Copilot GPT 5.5"
+        model: "glm-5.2"
+        modelLabel: "Copilot GLM 5.2"
         maxContextTokens: 99999999
