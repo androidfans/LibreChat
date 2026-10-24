@@ -45,9 +45,10 @@ endpoints:
           "gpt-6-astra",
           "deepseek-flash",
           "deepseek-pro",
+          "doubao-seed-2-1-pro-260628",
+          "doubao-seed-2-1-turbo-260628",
           "gemini-4-argon",
           "gemini-3.8-flash",
-          "gemini-3.5-flash",
           "glm-5.2"
         ]
         # 必须保持 false：动态抓取会用远端 /models 完全覆盖 default。
@@ -143,6 +144,26 @@ modelSpecs:
         modelLabel: "Copilot DeepSeek Pro"
         maxContextTokens: 99999999
 
+    - name: "copilot-doubao-seed-2-1-pro-260628"
+      label: "Copilot Doubao Seed 2.1 Pro"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "doubao-seed-2-1-pro-260628"
+        modelLabel: "Copilot Doubao Seed 2.1 Pro"
+        maxContextTokens: 99999999
+
+    - name: "copilot-doubao-seed-2-1-turbo-260628"
+      label: "Copilot Doubao Seed 2.1 Turbo"
+      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
+      description: ""
+      preset:
+        endpoint: "copilot"
+        model: "doubao-seed-2-1-turbo-260628"
+        modelLabel: "Copilot Doubao Seed 2.1 Turbo"
+        maxContextTokens: 99999999
+
     - name: "copilot-gemini-4-argon"
       label: "Copilot Gemini 4 Argon"
       iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
@@ -161,16 +182,6 @@ modelSpecs:
         endpoint: "copilot"
         model: "gemini-3.8-flash"
         modelLabel: "Copilot Gemini 3.8 Flash"
-        maxContextTokens: 99999999
-
-    - name: "copilot-gemini-3.5-flash"
-      label: "Copilot Gemini 3.5 Flash"
-      iconURL: "https://self-host-cdn.s3.bitiful.net/github-copilot-icon-white.webp"
-      description: ""
-      preset:
-        endpoint: "copilot"
-        model: "gemini-3.5-flash"
-        modelLabel: "Copilot Gemini 3.5 Flash"
         maxContextTokens: 99999999
 
     - name: "copilot-glm-5.2"
