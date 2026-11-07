@@ -34,6 +34,7 @@ import EditBadges from './EditBadges';
 import BadgeRow from './BadgeRow';
 import Mention from './Mention';
 import store from '~/store';
+import { traceMessage } from '~/utils/messageTrace';
 
 const ChatForm = memo(({ index = 0 }: { index?: number }) => {
   const submitButtonRef = useRef<HTMLButtonElement>(null);
@@ -89,6 +90,15 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
     () => conversation?.conversationId ?? Constants.NEW_CONVO,
     [conversation?.conversationId],
   );
+
+  useEffect(() => {
+    traceMessage('state.stopButton', {
+      conversationId,
+      isSubmitting,
+      showStopButton,
+      rendered: isSubmitting && showStopButton,
+    });
+  }, [conversationId, isSubmitting, showStopButton]);
 
   const isRTL = useMemo(
     () => (chatDirection != null ? chatDirection?.toLowerCase() === 'rtl' : false),
@@ -340,7 +350,17 @@ const ChatForm = memo(({ index = 0 }: { index?: number }) => {
               )}
               <div className={`${isRTL ? 'ml-2' : 'mr-2'}`}>
                 {isSubmitting && showStopButton ? (
-                  <StopButton stop={handleStopGenerating} setShowStopButton={setShowStopButton} />
+                  <StopButton
+                    stop={(event) => {
+                      traceMessage('action.stopClicked', {
+                        conversationId,
+                        isSubmitting,
+                        showStopButton,
+                      });
+                      handleStopGenerating(event);
+                    }}
+                    setShowStopButton={setShowStopButton}
+                  />
                 ) : (
                   endpoint && (
                     <SendButton

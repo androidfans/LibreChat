@@ -43,7 +43,7 @@ Every record has the prefix `[message-trace]` and a single JSON payload, visible
 | `client.query.result`, `client.cache.*` | API result versus retained browser cache, graph changes and cross-conversation cache redirects |
 | `client.branch.*`, `client.state.latest` | Visible branch, sibling index resets and cached latest-message changes |
 | `client.view.*` | Rendered DOM message IDs versus visible IDs, scroll position/height after switching, and collapsed text state |
-| `client.action.*`, `client.stream.*`, `stream.*` | Send/delete confirmation, selected parent, creation/finalization, cancellation, reconnection and disconnect |
+| `client.action.*`, `client.state.stopButton`, `client.stream.*`, `stream.*` | Send/delete/edit actions, edit blocking state, stop-button visibility and target resolution, abort outcome, selected parent, creation/finalization, cancellation, reconnection and disconnect |
 
 Graph arrays are chunked; use `snapshotId`/`offset` for server snapshots and `tabId`/`seq`/`offset` for browser snapshots. `missingParentCount` on an operation-scoped subset is relative to that subset; use a complete `db.messages.read` or browser cache snapshot before diagnosing an orphan. Large `$in` filters are capped at 300 entries; deletion target snapshots retain all selected IDs in separate chunks.
 
