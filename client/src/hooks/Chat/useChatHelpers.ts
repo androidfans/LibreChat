@@ -300,6 +300,12 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const stopGenerating = useCallback(async () => {
     const actualEndpoint = endpointType ?? endpoint;
     const isAssistants = isAssistantsEndpoint(actualEndpoint);
+    traceMessage('action.stopRequested', {
+      conversationId,
+      activeStreamId,
+      endpoint: actualEndpoint,
+      isAssistants,
+    });
     logger.debug('conversation', '[useChatHelpers] stopGenerating called', {
       conversationId,
       activeStreamId,
@@ -311,6 +317,13 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     setStopGenerationRequest((requestId) => requestId + 1);
     const stopTarget = await getCurrentStopTarget();
     const streamIdToAbort = activeStreamId ?? stopTarget.activeStreamId;
+    traceMessage('action.stopTarget', {
+      conversationId,
+      streamId: streamIdToAbort,
+      activeStreamId: stopTarget.activeStreamId,
+      userMessageId: stopTarget.userMessageId,
+      initialResponseId: stopTarget.initialResponseId,
+    });
 
     // For non-assistants endpoints (using resumable streams), call abort endpoint first
     const abortConversationId =
@@ -333,6 +346,10 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           streamId: streamIdToAbort ?? undefined,
           conversationId: abortConversationId,
         });
+        traceMessage('action.stopSucceeded', {
+          conversationId: stopConversationId,
+          streamId: streamIdToAbort,
+        });
         logger.debug('conversation', '[useChatHelpers] Abort mutation succeeded');
         await clearSubmissionIfCurrent({
           conversationId: stopConversationId,
@@ -342,6 +359,11 @@ export default function useChatHelpers(index = 0, paramId?: string) {
           allowPendingNew: true,
         });
       } catch (error) {
+        traceMessage('action.stopFailed', {
+          conversationId: stopConversationId,
+          streamId: streamIdToAbort,
+          error: error instanceof Error ? error.name : 'unknown',
+        });
         logger.error('conversation', '[useChatHelpers] Abort failed:', error);
         await clearSubmissionIfCurrent({
           conversationId: stopConversationId,
@@ -352,6 +374,11 @@ export default function useChatHelpers(index = 0, paramId?: string) {
         });
       }
     } else {
+      traceMessage('action.stopLocalCleanup', {
+        conversationId: stopConversationId,
+        streamId: streamIdToAbort,
+        reason: isAssistants ? 'assistants-endpoint' : 'missing-stop-target',
+      });
       logger.debug(
         'conversation',
         isAssistants

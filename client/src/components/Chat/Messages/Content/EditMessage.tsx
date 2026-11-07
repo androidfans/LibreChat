@@ -10,6 +10,7 @@ import { cn, removeFocusRings } from '~/utils';
 import { useLocalize } from '~/hooks';
 import Container from './Container';
 import store from '~/store';
+import { traceMessage } from '~/utils/messageTrace';
 
 const EditMessage = ({
   text,
@@ -51,7 +52,25 @@ const EditMessage = ({
     }
   }, []);
 
+  useEffect(() => {
+    traceMessage('action.editState', {
+      conversationId,
+      messageId,
+      parentMessageId,
+      isSubmitting,
+      blocked: isSubmitting,
+      editor: 'message',
+    });
+  }, [conversationId, isSubmitting, messageId, parentMessageId]);
+
   const resubmitMessage = (data: { text: string }) => {
+    traceMessage('action.editResubmit', {
+      conversationId,
+      messageId,
+      parentMessageId,
+      isSubmitting,
+      editor: 'message',
+    });
     if (message.isCreatedByUser) {
       ask(
         {
@@ -91,6 +110,13 @@ const EditMessage = ({
   };
 
   const updateMessage = (data: { text: string }) => {
+    traceMessage('action.editSave', {
+      conversationId,
+      messageId,
+      parentMessageId,
+      isSubmitting,
+      editor: 'message',
+    });
     const messages = getMessages();
     if (!messages) {
       return;

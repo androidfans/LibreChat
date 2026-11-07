@@ -13,6 +13,7 @@ import { useGetAddedConvo } from '~/hooks/Chat';
 import { cn, removeFocusRings } from '~/utils';
 import { useLocalize } from '~/hooks';
 import store from '~/store';
+import { traceMessage } from '~/utils/messageTrace';
 
 const EditTextPart = ({
   part,
@@ -59,7 +60,27 @@ const EditTextPart = ({
     }
   }, []);
 
+  useEffect(() => {
+    traceMessage('action.editState', {
+      conversationId,
+      messageId,
+      parentMessageId: message?.parentMessageId,
+      isSubmitting,
+      blocked: isSubmitting,
+      editor: 'content-part',
+      partIndex: index,
+    });
+  }, [conversationId, index, isSubmitting, message?.parentMessageId, messageId]);
+
   const resubmitMessage = (data: { text: string }) => {
+    traceMessage('action.editResubmit', {
+      conversationId,
+      messageId,
+      parentMessageId: message?.parentMessageId,
+      isSubmitting,
+      editor: 'content-part',
+      partIndex: index,
+    });
     const messages = getMessages();
     const parentMessage = messages?.find((msg) => msg.messageId === message?.parentMessageId);
 
@@ -94,6 +115,14 @@ const EditTextPart = ({
   };
 
   const updateMessage = (data: { text: string }) => {
+    traceMessage('action.editSave', {
+      conversationId,
+      messageId,
+      parentMessageId: message?.parentMessageId,
+      isSubmitting,
+      editor: 'content-part',
+      partIndex: index,
+    });
     const messages = getMessages();
     if (!messages) {
       return;
